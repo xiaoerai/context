@@ -23,9 +23,9 @@
 |------|------|
 | 运行时 | Node.js + Express |
 | 语言 | TypeScript |
-| 部署 | 阿里云函数计算 (Serverless) |
-| 认证 | 阿里云 IDaaS |
-| 数据库 | 阿里云 Tablestore |
+| 部署 | 微信云托管 (Serverless) |
+| 数据库 | 微信云开发数据库 (NoSQL) |
+| 短信 | 阿里云短信 |
 | 存储 | 阿里云 OSS |
 
 ### 管理后台（二期）
@@ -44,6 +44,15 @@
 | 文档 | 说明 |
 |------|------|
 | [提交规范](./commit-convention.md) | Git commit 格式 |
+
+### 功能文档
+| 文档 | 说明 |
+|------|------|
+| [功能总览](./features/README.md) | 所有功能模块索引 |
+| [登录认证](./features/auth.md) | 手机号+短信验证码 |
+| [办理入住](./features/checkin-flow.md) | 验证身份 → 选择订单 → 填写信息 |
+| [押金支付](./features/deposit.md) | 微信支付押金 |
+| [退房申请](./features/checkout.md) | 申请退房，退还押金 |
 
 ### 客人端小程序
 | 文档 | 说明 |
