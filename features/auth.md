@@ -25,15 +25,27 @@
 | 认证控制器 | ✅ 完成 | `controllers/auth.controller.ts` |
 | 短信服务 | ✅ 完成 | `services/sms.service.ts` |
 | 认证服务 | ✅ 完成 | `services/auth.service.ts` |
-| 阿里云短信 SDK | ⏳ 模拟中 | `services/sms.ts` |
-| 微信 API | ✅ 完成 | `services/wechat.ts` |
+| 阿里云短信 SDK | ⏳ 模拟中 | `services/sms.ts`（开发阶段用随机验证码）|
+| 微信 API | ⏳ 模拟中 | `services/wechat.ts`（待配置 AppID） |
+| 数据库 | ✅ 已联调 | CloudBase 云开发数据库 |
 
 ### API
 
 | 接口 | 状态 |
 |------|------|
-| `POST /api/sms/send` | ✅ 完成 |
-| `POST /api/auth/login` | ✅ 完成 |
+| `POST /api/sms/send` | ✅ 已联调 |
+| `POST /api/auth/login` | ✅ 已联调 |
+| `GET /api/orders` | ✅ 已联调（模拟数据） |
+
+### 联调进度
+
+| 环节 | 状态 | 说明 |
+|------|------|------|
+| 前端 → 后端 HTTP 调用 | ✅ 完成 | H5 开发模式通过 `localhost:7001` |
+| 后端 → 数据库 | ✅ 完成 | CloudBase 云开发数据库已配置 |
+| 发送验证码 | ✅ 完成 | 验证码存入数据库 |
+| 登录验证 | ✅ 完成 | 验证码校验 + 用户创建/更新 |
+| 获取订单 | ⏳ 模拟中 | 后端返回模拟订单数据 |
 
 ---
 
@@ -72,7 +84,10 @@
   │                           │                    │                  │
   │                           │      8. 验证 smsCode + 保存用户        │
   │                           │                    │                  │
-  │◀── 9. 返回 { token, orders } ─────────────────────────────────────│
+  │◀── 9. 返回 { token } ────────────────────────────────────────────│
+  │                           │                    │                  │
+  │── 10. GET /api/orders?phone=xxx ─────────────────────────────────▶│
+  │◀── 11. 返回订单列表 ─────────────────────────────────────────────│
 ```
 
 ---
@@ -123,13 +138,31 @@ POST /api/auth/login
 **响应**：
 ```json
 {
-  "token": "JWT token",
-  "orders": [
+  "success": true,
+  "data": {
+    "token": "JWT token"
+  }
+}
+```
+
+---
+
+### 获取订单
+
+```
+GET /api/orders?phone=13800138000
+```
+
+**响应**：
+```json
+{
+  "success": true,
+  "data": [
     {
-      "orderId": "ORD20260309001",
-      "roomNumber": "301",
-      "checkInDate": "2026-03-09",
-      "checkOutDate": "2026-03-11"
+      "orderId": "ORD20260316001",
+      "roomNumber": "悦享大床房 301",
+      "checkInDate": "2026-03-16",
+      "checkOutDate": "2026-03-18"
     }
   ]
 }
@@ -196,8 +229,10 @@ interface AppState {
 |------|------|
 | `routes/sms.ts` | 短信路由 |
 | `routes/auth.ts` | 认证路由 |
+| `routes/orders.ts` | 订单路由 |
 | `controllers/sms.controller.ts` | 短信控制器 |
 | `controllers/auth.controller.ts` | 认证控制器 |
+| `controllers/orders.controller.ts` | 订单控制器 |
 | `services/sms.service.ts` | 短信业务逻辑 |
 | `services/auth.service.ts` | 认证业务逻辑 |
 | `services/sms.ts` | 阿里云短信 SDK |
@@ -207,7 +242,11 @@ interface AppState {
 
 ## 测试数据
 
+开发阶段使用随机验证码，查看方式：
+1. 后端控制台会打印：`📱 验证码: 123456`
+2. 数据库 `sms_codes` 集合中查看
+
 ```
-手机号：13800138000
-验证码：1234
+手机号：任意 11 位手机号
+验证码：后端控制台输出 / 数据库查询
 ```

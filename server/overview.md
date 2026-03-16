@@ -44,6 +44,18 @@
 
 ---
 
+## 开发环境配置状态
+
+| 配置项 | 状态 | 说明 |
+|--------|------|------|
+| 云开发数据库 | ✅ 已配置 | 环境ID: `xiaoer-dev-3g5g7pw9482967c9` |
+| 数据库集合 | ✅ 已创建 | sms_codes, users, orders, guests, rooms |
+| 阿里云短信 | ⏳ 待配置 | 开发阶段用随机验证码 |
+| 微信小程序 | ⏳ 待配置 | 需要 AppID 和 Secret |
+| 微信支付 | ⏳ 待配置 | 需要商户号和 API 密钥 |
+
+---
+
 ## 认证流程
 
 > 手机号短信验证码 + wx.login 获取 openid
@@ -108,6 +120,9 @@
 │   │
 │   └── utils/                      # 工具函数
 │       └── jwt.ts                  # JWT 签发/验证
+│
+├── scripts/
+│   └── init-db.ts                 # 数据库集合初始化脚本
 │
 ├── Dockerfile                      # 容器配置
 ├── package.json
@@ -296,6 +311,21 @@ const { data } = await db.collection('sms_codes')
   .where({ phone, code })
   .get()
 ```
+
+---
+
+## 初始化数据库
+
+首次部署需要创建数据库集合：
+
+```bash
+cd server
+npx tsx scripts/init-db.ts
+```
+
+脚本会创建以下集合：`sms_codes`, `users`, `orders`, `guests`, `rooms`
+
+> 注意：CloudBase 是 NoSQL，不需要预定义字段结构，字段在插入数据时自动创建。
 
 ---
 
