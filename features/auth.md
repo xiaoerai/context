@@ -23,11 +23,10 @@
 | 认证路由 | ✅ 完成 | `routes/auth.ts` |
 | 短信控制器 | ✅ 完成 | `controllers/sms.controller.ts` |
 | 认证控制器 | ✅ 完成 | `controllers/auth.controller.ts` |
-| 短信服务 | ✅ 完成 | `services/sms.service.ts` |
-| 认证服务 | ✅ 完成 | `services/auth.service.ts` |
-| 阿里云短信 SDK | ⏳ 模拟中 | `services/sms.ts`（开发阶段用随机验证码）|
-| 微信 API | ⏳ 模拟中 | `services/wechat.ts`（待配置 AppID） |
-| 数据库 | ✅ 已联调 | CloudBase 云开发数据库 |
+| 短信服务 | ✅ 完成 | `services/sms.service.ts`（含阿里云短信 SDK，开发阶段用随机验证码）|
+| 认证服务 | ✅ 完成 | `services/auth.service.ts`（含 JWT 签发/验证）|
+| 微信 API | ⏳ 模拟中 | `services/wechat.service.ts`（待配置 AppID） |
+| 数据库 | ✅ 已联调 | `db/` 目录（CloudBase 云开发数据库）|
 
 ### API
 
@@ -233,10 +232,12 @@ interface AppState {
 | `controllers/sms.controller.ts` | 短信控制器 |
 | `controllers/auth.controller.ts` | 认证控制器 |
 | `controllers/orders.controller.ts` | 订单控制器 |
-| `services/sms.service.ts` | 短信业务逻辑 |
-| `services/auth.service.ts` | 认证业务逻辑 |
-| `services/sms.ts` | 阿里云短信 SDK |
-| `services/wechat.ts` | 微信 API |
+| `services/sms.service.ts` | 短信业务逻辑 + 阿里云短信 SDK |
+| `services/auth.service.ts` | 认证业务逻辑 + JWT 签发/验证 |
+| `services/wechat.service.ts` | 微信 API |
+| `db/sms.ts` | 验证码数据操作 |
+| `db/users.ts` | 用户数据操作 |
+| `db/orders.ts` | 订单数据操作 |
 
 ---
 

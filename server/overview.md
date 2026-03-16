@@ -107,22 +107,22 @@
 │   │   └── checkin.controller.ts   # 入住
 │   │
 │   ├── services/                   # 服务层（核心业务逻辑）
-│   │   ├── auth.service.ts         # 登录业务逻辑
-│   │   ├── sms.service.ts          # 短信业务逻辑
-│   │   ├── db.ts                   # 数据库操作
-│   │   ├── sms.ts                  # 阿里云短信 SDK
-│   │   └── wechat.ts               # 微信 API
+│   │   ├── auth.service.ts         # 登录 + JWT 签发/验证
+│   │   ├── sms.service.ts          # 短信业务逻辑 + 阿里云短信 SDK
+│   │   └── wechat.service.ts       # 微信 API
 │   │
-│   ├── middleware/                 # 中间件
-│   │   ├── auth.ts                 # JWT 验证
-│   │   ├── error.ts                # 错误处理
-│   │   └── logger.ts               # 日志
+│   ├── db/                         # 数据库层
+│   │   ├── client.ts               # CloudBase 客户端初始化
+│   │   ├── index.ts                # 统一导出
+│   │   ├── sms.ts                  # 验证码数据操作
+│   │   ├── users.ts                # 用户数据操作
+│   │   ├── orders.ts               # 订单数据操作
+│   │   └── init.ts                 # 数据库初始化脚本
 │   │
-│   └── utils/                      # 工具函数
-│       └── jwt.ts                  # JWT 签发/验证
-│
-├── scripts/
-│   └── init-db.ts                 # 数据库集合初始化脚本
+│   └── middleware/                 # 中间件
+│       ├── auth.ts                 # JWT 验证
+│       ├── error.ts                # 错误处理
+│       └── logger.ts               # 日志
 │
 ├── Dockerfile                      # 容器配置
 ├── package.json
@@ -287,29 +287,42 @@ PORT=7001
 ## 数据库连接
 
 ```typescript
-// services/db.ts
+// db/client.ts - 客户端初始化
 import tcb from '@cloudbase/node-sdk'
 
 const app = tcb.init({
-  env: process.env.TCB_ENV_ID,
+  env: process.env.TCB_ENV_ID!,
   secretId: process.env.TCB_SECRET_ID,
   secretKey: process.env.TCB_SECRET_KEY,
 })
 
 export const db = app.database()
+```
 
-// 示例：存验证码
-await db.collection('sms_codes').add({
-  phone: '13800138000',
-  code: '123456',
-  expireAt: new Date(Date.now() + 5 * 60 * 1000),
-  createdAt: new Date()
-})
+```typescript
+// db/sms.ts - 验证码数据操作示例
+import { db } from './client'
 
-// 示例：查验证码
-const { data } = await db.collection('sms_codes')
-  .where({ phone, code })
-  .get()
+export async function saveSmsCode(phone: string, code: string): Promise<void> {
+  await db.collection('sms_codes').add({
+    phone,
+    code,
+    expireAt: new Date(Date.now() + 5 * 60 * 1000),
+    createdAt: new Date()
+  })
+}
+
+export async function verifySmsCode(phone: string, code: string): Promise<boolean> {
+  const { data } = await db.collection('sms_codes')
+    .where({ phone, code })
+    .get()
+  return data.length > 0 && new Date(data[0].expireAt) > new Date()
+}
+```
+
+```typescript
+// 使用方式
+import { saveSmsCode, verifySmsCode } from './db'
 ```
 
 ---
@@ -320,7 +333,7 @@ const { data } = await db.collection('sms_codes')
 
 ```bash
 cd server
-npx tsx scripts/init-db.ts
+npx tsx src/db/init.ts
 ```
 
 脚本会创建以下集合：`sms_codes`, `users`, `orders`, `guests`, `rooms`
