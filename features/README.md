@@ -9,6 +9,7 @@
 | 功能 | 文档 | 状态 | 说明 |
 |------|------|------|------|
 | 登录认证 | [auth.md](./auth.md) | ✅ 完成 | 手机号+短信验证码 |
+| 订单查询 | [order-sync.md](./order-sync.md) | ⬜ 待开发 | 实时查询百居易订单 |
 | 办理入住 | [checkin-flow.md](./checkin-flow.md) | ✅ 完成 | 验证身份 → 选择订单 → 填写信息 |
 | 押金支付 | [deposit.md](./deposit.md) | ⬜ 待开发 | 微信支付押金 |
 | 退房申请 | [checkout.md](./checkout.md) | ⬜ 待开发 | 申请退房，退还押金 |

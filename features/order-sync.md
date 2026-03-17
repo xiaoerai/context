@@ -1,4 +1,4 @@
-# 订单同步
+# 订单查询
 
 > 状态：⬜ 待开发
 
@@ -6,7 +6,7 @@
 
 ## 概述
 
-从百居易 (Hostex) PMS 系统同步订单到本地数据库，供客人入住时查询。
+客人办理入住时，通过手机号**实时查询**百居易 (Hostex) 订单，不做本地同步。
 
 ### 为什么不用官方 API？
 
@@ -17,6 +17,15 @@
 
 我们采用 **Session 请求** 方案，直接用房东账号的登录态获取订单。
 
+### 为什么不做本地同步？
+
+| 方案 | 复杂度 | 说明 |
+|------|--------|------|
+| 本地同步 | 高 | 需要同步服务、云函数、数据库、处理取消/修改 |
+| **实时查询** | **低** | 直接调 API，数据永远最新 |
+
+民宿场景一天就几个客人，实时查询完全够用。
+
 ---
 
 ## 技术方案
@@ -24,37 +33,33 @@
 ### 架构
 
 ```
-┌─────────────────┐     定时触发(5-10分钟)     ┌─────────────────┐
-│   腾讯云函数     │ ◀────────────────────────  │   定时器        │
-│  (sync-service) │                            └─────────────────┘
+┌─────────────────┐
+│   小程序前端     │
+│   输入手机号     │
 └────────┬────────┘
          │
-         │ 1. HTTP 请求 + Cookie
+         │ POST /api/orders/search
+         ▼
+┌─────────────────┐
+│   主服务 server  │
+│  hostex.service │
+└────────┬────────┘
+         │
+         │ HTTP + Cookie
          ▼
 ┌─────────────────┐
 │   百居易 API     │
 │  myhostex.com   │
 └────────┬────────┘
          │
-         │ 2. 返回订单列表
+         │ 订单列表
          ▼
 ┌─────────────────┐
-│   同步服务       │  3. 解析 + 转换格式
-└────────┬────────┘
-         │
-         │ 4. 写入数据库
-         ▼
-┌─────────────────┐
-│  CloudBase 数据库│
-│   orders 集合    │
-└────────┬────────┘
-         │
-         │ 5. 客人查询订单
-         ▼
-┌─────────────────┐
-│   主服务 server  │
+│   格式化 + 返回  │
 └─────────────────┘
 ```
+
+**简单直接，不需要额外服务。**
 
 ### 认证方式
 
@@ -82,15 +87,15 @@ GET https://www.myhostex.com/api/reservation_order/list
 |------|------|------|
 | page | int | 页码 |
 | page_size | int | 每页数量 |
-| date_type | string | 日期类型：check_in |
-| is_exclude_pending | bool | 排除待确认订单 |
+| start_date | string | 入住日期起始（YYYY-MM-DD） |
+| end_date | string | 入住日期截止（YYYY-MM-DD） |
 | opid | string | 房东 ID |
 | opclient | string | 客户端标识 |
 
 **请求示例**：
 
 ```javascript
-fetch("https://www.myhostex.com/api/reservation_order/list?page=1&page_size=50&date_type=check_in&is_exclude_pending=true&opid=120002&opclient=Web-Linux-Chrome", {
+fetch("https://www.myhostex.com/api/reservation_order/list?page=1&page_size=100&start_date=2026-03-17&end_date=2026-03-24&opid=120002&opclient=Web-Linux-Chrome", {
   headers: {
     "accept": "application/json",
     "cookie": "hostex_session=xxx; operator_id=120002"
@@ -98,32 +103,35 @@ fetch("https://www.myhostex.com/api/reservation_order/list?page=1&page_size=50&d
 })
 ```
 
-**响应示例**：
+**响应结构**（嵌套结构，入住信息在 reservations 数组中）：
 
 ```json
 {
-  "request_id": "RT2026031616162054907",
   "error_code": 0,
   "error_msg": "操作成功",
   "data": {
     "list": [
       {
-        "code": "1-801252832144",
-        "uniq_code": "1-801252832144-AJS82",
-        "house_id": 2866,
-        "house_name": "悦享民宿",
-        "room_name": "大床房 301",
-        "check_in": "2026-03-16",
-        "check_out": "2026-03-18",
-        "status": "accepted",
-        "staying_status": "wait_stay",
-        "lock_password": "123456",
-        "guests": [
+        "code": "22-1092253481431381639-ib96sakgw5",
+        "create_time": "2026-03-16 23:05:13",
+        "update_time": "2026-03-16 23:05:13",
+        "client": {
+          "name": "周粥",
+          "phone": "15072851529"
+        },
+        "reservations": [
           {
-            "name": "张三",
-            "full_name": "张三",
-            "phone": "+86 138 0013 8000",
-            "email": "user@example.com"
+            "check_in": "2026-03-20 00:00:00",
+            "check_out": "2026-03-21 00:00:00",
+            "staying_status": "staying_wait",
+            "house": {
+              "id": 12556371,
+              "title": "301 轻旅｜投影大床房"
+            },
+            "guest": {
+              "name": "周粥",
+              "phone": "15072851529"
+            }
           }
         ]
       }
@@ -138,16 +146,19 @@ fetch("https://www.myhostex.com/api/reservation_order/list?page=1&page_size=50&d
 
 ### 百居易 → 本地数据库
 
+注意：订单是**嵌套结构**，入住信息在 `reservations[0]` 中。
+
 | 百居易字段 | 本地字段 | 说明 |
 |-----------|---------|------|
-| uniq_code | orderId | 订单唯一编码 |
-| room_name | roomNumber | 房间名称 |
-| check_in | checkInDate | 入住日期 |
-| check_out | checkOutDate | 离店日期 |
-| staying_status | status | 入住状态 |
-| lock_password | lockPassword | 门锁密码 |
-| guests[0].phone | phone | 客人手机号 |
-| guests[0].full_name | guestName | 客人姓名 |
+| code | orderId | 订单编码 |
+| client.phone | phone | 客人手机号 |
+| client.name | guestName | 客人姓名 |
+| reservations[0].check_in | checkInDate | 入住日期 |
+| reservations[0].check_out | checkOutDate | 离店日期 |
+| reservations[0].staying_status | status | 入住状态 |
+| reservations[0].house.title | roomNumber | 房间名称 |
+| create_time | - | 订单创建时间（仅日志用） |
+| update_time | - | 订单更新时间（判断是否需要更新） |
 
 ### 手机号格式化
 
@@ -166,24 +177,90 @@ function normalizePhone(phone: string): string {
 
 ## 同步策略
 
+> **暂不使用**：第一版采用纯实时查询，不做本地同步。以下内容保留供后续参考。
+
+### 核心思路
+
+我们的业务场景是**办理入住**，只需要同步**即将入住**的订单：
+
+```
+预订时间 ≠ 入住时间
+
+客人3月1日下单，订了4月1日的房
+    ↓
+我们不用立即同步
+    ↓
+等到3月25日同步时（4月1日已在7天范围内）
+    ↓
+自然就拉到了
+    ↓
+4月1日客人来办入住，订单已经在本地
+```
+
 ### 定时同步
 
 | 配置 | 值 | 说明 |
 |------|-----|------|
 | 频率 | 每 5-10 分钟 | 云函数定时触发 |
-| 范围 | 近 30 天订单 | 避免数据量过大 |
+| 范围 | **今天 ~ 今天+7天** | 只拉即将入住的订单 |
 | 去重 | 按 orderId | 已存在则更新 |
+
+### API 参数（经测试验证）
+
+| 参数 | 有效 | 说明 |
+|------|------|------|
+| `start_date` / `end_date` | ✅ | 按入住日期筛选 |
+| `page` / `page_size` | ✅ | 分页 |
+| `staying_status` | ✅ | 入住状态筛选 |
+| 按创建时间筛选 | ❌ | **不支持** |
 
 ### 同步逻辑
 
 ```
-1. 获取百居易订单列表
-2. 遍历每个订单：
+1. 请求百居易订单：start_date=今天，end_date=今天+7天
+2. 遍历每条订单：
+   - 从 reservations[0] 提取入住信息
+   - 从 client 提取客人信息
    - 格式化手机号
-   - 检查本地是否存在
-   - 存在 → 更新
-   - 不存在 → 插入
-3. 记录同步日志
+   - 按 orderId 查本地：
+     - 不存在 → 插入
+     - 存在 → 对比 update_time，有变化则更新
+3. 输出统计：新增 X，更新 Y
+```
+
+### 实时验证（防止取消/修改不同步）
+
+本地同步只是为了**快速展示**候选订单，最终办理入住时**实时验证**百居易：
+
+```
+客人输入手机号
+    ↓
+本地查询 → 快速展示候选订单列表
+    ↓
+客人选择订单，点击"办理入住"
+    ↓
+后端调用百居易 API，用 orderId 查询订单详情
+    ↓
+订单存在且 status=accepted → 继续入住流程
+订单不存在或已取消 → "订单无效，请联系房东"
+```
+
+**优点**：
+- 取消/修改的订单不怕漏同步
+- 最终以百居易实时数据为准
+- 本地数据只是缓存，加速查询
+
+### 漏单兜底
+
+如果客人查不到订单（比如远期预订还没同步到），提供手动录入入口：
+
+```
+客人输入手机号
+    ↓
+本地查询
+    ↓
+找到 → 正常入住流程
+找不到 → "未找到订单，请联系房东" 或 手动录入
 ```
 
 ---
