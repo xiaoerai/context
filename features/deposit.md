@@ -1,6 +1,6 @@
 # 押金支付
 
-> 状态：⬜ 待开发
+> 状态：✅ 完成（收钱吧接口 mock 中，待接入真实支付）
 
 ---
 
@@ -10,38 +10,103 @@
 
 | 模块 | 状态 | 文件 |
 |------|------|------|
-| 押金支付页 | ⬜ 待开发 | `pages/deposit/index.tsx` |
-| 入住成功页 | ⬜ 待开发 | `pages/success/index.tsx` |
+| 押金支付弹窗 | ✅ 完成 | `hooks/useCheckinFlow.tsx`（deposit step） |
+| 入住成功弹窗 | ✅ 完成 | `hooks/useCheckinFlow.tsx`（success step） |
+| 押金 API | ✅ 完成 | `api/deposit.ts` |
 
 ### 后端
 
 | 模块 | 状态 | 文件 |
 |------|------|------|
-| 支付路由 | ⬜ 待开发 | `routes/deposit.ts` |
-| 支付控制器 | ⬜ 待开发 | `controllers/deposit.controller.ts` |
-| 支付服务 | ⬜ 待开发 | `services/deposit.service.ts` |
-| 微信支付 SDK | ⬜ 待开发 | `services/wechat-pay.ts` |
+| 支付路由 | ✅ 完成 | `routes/deposit.ts` |
+| 支付控制器 | ✅ 完成 | `controllers/deposit.controller.ts` |
+| 支付服务 | ✅ 完成（mock） | `services/deposit.service.ts` |
+| 收钱吧支付 SDK | ⬜ 待接入 | 待商户号申请完成 |
 
 ### API
 
 | 接口 | 状态 |
 |------|------|
-| `POST /api/deposit/create` | ⬜ 待开发 |
-| `POST /api/deposit/notify` | ⬜ 待开发 |
-| `GET /api/orders/:id/room-info` | ⬜ 待开发 |
+| `POST /api/deposit/create` | ✅ 完成（mock tradeNO） |
+| `POST /api/deposit/confirm` | ✅ 完成（mock，真实环境由收钱吧回调） |
 
 ### 数据表
 
 | 集合 | 状态 |
 |------|------|
-| rooms | ⬜ 待创建 |
-| orders (支付字段) | ⬜ 待扩展 |
+| deposits | ✅ 已创建 |
+| rooms | ⬜ 待创建数据 |
 
 ---
 
 ## 概述
 
 用户提交入住信息后，需支付押金才能获取门锁密码和WiFi信息。
+
+---
+
+## 账号申请流程
+
+共需申请 3 个账号，前 2 个由营业执照法人（朋友）操作，第 3 个可自行申请。
+
+### 前置条件
+
+- 个体工商户营业执照（法人是朋友）
+- 法人的个人支付宝账号
+
+### 第 1 步：支付宝商家号
+
+1. 法人登录 [支付宝商家中心](https://b.alipay.com)
+2. 选择「个体工商户」主体类型（不要选企业）
+3. 上传营业执照，完成认证（不需要对公账户）
+4. 免费
+
+### 第 2 步：支付宝小程序
+
+1. 法人登录 [支付宝开放平台](https://open.alipay.com)
+2. 点击「创建小程序」
+3. 绑定第 1 步的商家账号（填自己的支付宝，同一个人直接通过）
+4. 创建成功后，在小程序设置中把开发者（我）加为**开发成员**
+5. 上线前需完成小程序备案
+
+### 第 3 步：收钱吧商户
+
+1. 登录 [收钱吧](https://www.shouqianba.com) 申请商户入驻
+2. 提供营业执照等资料
+3. 获取服务商序列号（vendor_sn）、终端序列号等密钥
+4. 将小程序 AppID 提供给收钱吧进行配置
+5. 费率 0.38%
+
+### 申请状态
+
+| 账号 | 状态 |
+|------|------|
+| 个体工商户营业执照 | ⬜ 待办理 |
+| 支付宝商家号 | ⬜ 待申请 |
+| 支付宝小程序 | ⬜ 待创建 |
+| 收钱吧商户 | ⬜ 待申请 |
+
+---
+
+## 支付方案
+
+### 平台：支付宝小程序
+
+选择支付宝小程序而非微信小程序，因为：
+- 支付宝个人主体可免费认证
+- 微信需企业认证（300元/年）才能使用支付功能
+
+### 支付通道：收钱吧（Shouqianba）
+
+选择收钱吧作为支付聚合服务，因为：
+- 支持支付宝、微信等多种支付方式
+- 费率 0.38%
+- 无需分别对接各支付平台 SDK
+- 个人商户可接入
+
+### 支付方式
+
+在支付宝小程序中，通过收钱吧 SDK 调起支付宝支付。
 
 ---
 
@@ -63,7 +128,7 @@
 │  │      ¥500.00            │    │
 │  └─────────────────────────┘    │
 │                                 │
-│       [微信支付]                │
+│       [支付宝支付]              │
 └─────────────────────────────────┘
       ↓ 支付成功
 跳转入住成功页（获取门锁密码）
@@ -86,7 +151,7 @@
 | 押金金额 | 金额（元） |
 
 **操作**：
-- 点击「微信支付」调起微信支付
+- 点击「支付宝支付」通过收钱吧调起支付
 
 ---
 
@@ -113,16 +178,16 @@
 ## 支付流程
 
 ```
-小程序                         后端                        微信支付
+小程序                         后端                        收钱吧
   │                             │                            │
   │── 1. POST /api/deposit/create ──▶│                        │
   │      { orderId }            │                            │
-  │                             │──── 2. 统一下单 ───────────▶│
+  │                             │──── 2. 预下单 ────────────▶│
   │                             │◀─── 3. 返回支付参数 ────────│
   │◀── 4. 返回支付参数 ──────────│                            │
   │                             │                            │
-  │── 5. wx.requestPayment ─────────────────────────────────▶│
-  │◀── 6. 支付结果 ─────────────────────────────────────────│
+  │── 5. my.tradePay ──────────────────────────────────────▶│
+  │◀── 6. 支付结果 ────────────────────────────────────────│
   │                             │                            │
   │                             │◀─── 7. 支付回调 ───────────│
   │                             │      POST /api/deposit/notify
@@ -151,13 +216,12 @@ POST /api/deposit/create
 **响应**：
 ```json
 {
-  "timeStamp": "1234567890",
-  "nonceStr": "xxx",
-  "package": "prepay_id=xxx",
-  "signType": "RSA",
-  "paySign": "xxx"
+  "tradeNo": "xxx",
+  "orderStr": "xxx"
 }
 ```
+
+> 返回收钱吧的交易号和支付宝调起参数
 
 ---
 
@@ -167,7 +231,7 @@ POST /api/deposit/create
 POST /api/deposit/notify
 ```
 
-> 微信支付服务器回调，更新订单押金状态
+> 收钱吧服务器回调，更新订单押金状态
 
 ---
 
@@ -218,7 +282,7 @@ interface CheckInResult {
   depositStatus: string,  // unpaid → paid → refunded
   depositAmount: number,  // 押金金额（分）
   depositPaidAt: Date,    // 支付时间
-  transactionId: string,  // 微信支付订单号
+  transactionId: string,  // 收钱吧交易号
 }
 ```
 
@@ -258,15 +322,16 @@ interface CheckInResult {
 | `routes/deposit.ts` | 支付路由 |
 | `controllers/deposit.controller.ts` | 支付控制器 |
 | `services/deposit.service.ts` | 支付业务逻辑 |
-| `services/wechat-pay.ts` | 微信支付 SDK |
+| `services/shouqianba.ts` | 收钱吧支付 SDK 封装 |
 
 ---
 
 ## 环境变量
 
 ```bash
-# 微信支付
-WECHAT_MCH_ID=xxx          # 商户号
-WECHAT_API_KEY=xxx         # API密钥
-WECHAT_CERT_PATH=xxx       # 证书路径（退款用）
+# 收钱吧
+SQB_VENDOR_SN=xxx          # 服务商序列号
+SQB_VENDOR_KEY=xxx          # 服务商密钥
+SQB_TERMINAL_SN=xxx         # 终端序列号
+SQB_TERMINAL_KEY=xxx        # 终端密钥
 ```
