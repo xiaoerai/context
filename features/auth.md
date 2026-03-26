@@ -1,6 +1,6 @@
 # 登录认证
 
-> 状态：✅ 完成
+> 状态：🔄 改造中（支付宝授权 + 多端支持）
 
 ---
 
@@ -10,10 +10,9 @@
 
 | 模块 | 状态 | 文件 |
 |------|------|------|
-| 登录页 | ✅ 完成 | `pages/login/index.tsx` |
-| 办理入住弹窗 | ✅ 完成 | `pages/index/components/CheckInModal/index.tsx` |
+| 入住流程（含登录） | ✅ 完成 | `hooks/checkinFlow/usePhoneStep.ts` |
 | 状态管理 | ✅ 完成 | `stores/useAppStore.ts` |
-| 认证 Hook | ✅ 完成 | `hooks/useAuth.ts` |
+| 登录 API | 🔄 待改造 | `api/auth.ts`（需接入 `my.getAuthCode`） |
 
 ### 后端
 
@@ -21,54 +20,48 @@
 |------|------|------|
 | 短信路由 | ✅ 完成 | `routes/sms.ts` |
 | 认证路由 | ✅ 完成 | `routes/auth.ts` |
-| 短信控制器 | ✅ 完成 | `controllers/sms.controller.ts` |
-| 认证控制器 | ✅ 完成 | `controllers/auth.controller.ts` |
-| 短信服务 | ✅ 完成 | `services/sms.service.ts`（含阿里云短信 SDK，开发阶段用随机验证码）|
-| 认证服务 | ✅ 完成 | `services/auth.service.ts`（含 JWT 签发/验证）|
-| 微信 API | ⏳ 模拟中 | `services/wechat.service.ts`（待配置 AppID） |
-| 数据库 | ✅ 已联调 | `db/` 目录（CloudBase 云开发数据库）|
+| 认证服务 | 🔄 待改造 | `services/auth.service.ts`（需接入支付宝 OAuth） |
+| 支付宝 OAuth | ⬜ 待开发 | `services/alipay.service.ts`（新增 `getAlipayUserId`） |
+| 短信服务 | ✅ 完成 | `services/sms.service.ts`（阿里云短信未接入，开发阶段 mock）|
+| 数据库 | 🔄 待改造 | `db/users.ts`（需新增 `alipayUserId` 字段） |
 
 ### API
 
 | 接口 | 状态 |
 |------|------|
 | `POST /api/sms/send` | ✅ 已联调 |
-| `POST /api/auth/login` | ✅ 已联调 |
-| `GET /api/orders` | ✅ 已联调（模拟数据） |
-
-### 联调进度
-
-| 环节 | 状态 | 说明 |
-|------|------|------|
-| 前端 → 后端 HTTP 调用 | ✅ 完成 | H5 开发模式通过 `localhost:7001` |
-| 后端 → 数据库 | ✅ 完成 | CloudBase 云开发数据库已配置 |
-| 发送验证码 | ✅ 完成 | 验证码存入数据库 |
-| 登录验证 | ✅ 完成 | 验证码校验 + 用户创建/更新 |
-| 获取订单 | ⏳ 模拟中 | 后端返回模拟订单数据 |
+| `POST /api/auth/login` | 🔄 待改造（需支持 `platform` + `authCode`） |
+| `GET /api/orders` | ✅ 已联调 |
 
 ---
 
 ## 概述
 
-用户通过「订单手机号 + 短信验证码」验证身份，无需微信授权登录。
+用户通过「订单手机号 + 短信验证码」验证身份，同时获取平台授权（支付宝 user_id / 微信 openid），用于后续支付。
 
-### 为什么用短信验证码？
+### 多端设计
 
-| 原因 | 说明 |
-|------|------|
-| 安全 | 防止他人偷看订单信息 |
-| 灵活 | 用户可能用别人手机号订房（帮家人订、公司号等） |
-| 简单 | 无需微信认证费用（短信费约 0.045元/条） |
+`phone` 作为跨端统一标识，各平台 ID 作为附属字段：
+
+| 平台 | 授权方式 | 获取的用户标识 | 存储字段 |
+|------|----------|---------------|----------|
+| 支付宝小程序 | `my.getAuthCode({ scopes: 'auth_base' })` | user_id | `alipayUserId` |
+| 微信小程序 | `wx.login()` | openid | `openid` |
+| H5 | 无 | 无 | 无 |
+
+同一手机号在不同平台登录，关联到同一个用户。
 
 ---
 
 ## 认证流程
 
+### 支付宝小程序（当前重点）
+
 ```
-小程序                      阿里云短信              微信              后端
+小程序                      阿里云短信              支付宝              后端
   │                           │                    │                  │
-  │── 1. 打开小程序，wx.login ─────────────────────▶│                  │
-  │◀── 2. 返回 code ──────────────────────────────│                  │
+  │── 1. my.getAuthCode ──────────────────────────▶│                  │
+  │◀── 2. 返回 authCode ─────────────────────────│                  │
   │                           │                    │                  │
   │   [用户点击办理入住，输入手机号]                  │                  │
   │                           │                    │                  │
@@ -78,12 +71,17 @@
   │                           │                    │                  │
   │   [用户输入验证码]          │                    │                  │
   │                           │                    │                  │
-  │── 6. POST /api/auth/login { code, phone, smsCode } ───────────────▶│
-  │                           │                    │◀─ 7. code→openid─│
+  │── 6. POST /api/auth/login ────────────────────────────────────────▶│
+  │      { authCode, phone, smsCode, platform: 'alipay' }             │
+  │                           │                    │                  │
+  │                           │        7. alipay.system.oauth.token ──▶│
+  │                           │           authCode → user_id           │
   │                           │                    │                  │
   │                           │      8. 验证 smsCode + 保存用户        │
+  │                           │         存 alipayUserId                │
   │                           │                    │                  │
   │◀── 9. 返回 { token } ────────────────────────────────────────────│
+  │        (JWT 含 alipayUserId，支付时使用)                           │
   │                           │                    │                  │
   │── 10. GET /api/orders?phone=xxx ─────────────────────────────────▶│
   │◀── 11. 返回订单列表 ─────────────────────────────────────────────│
@@ -128,11 +126,19 @@ POST /api/auth/login
 **请求**：
 ```json
 {
-  "code": "wx.login返回的code",
+  "code": "平台授权码（authCode）",
   "phone": "13800138000",
-  "smsCode": "123456"
+  "smsCode": "123456",
+  "platform": "alipay"
 }
 ```
+
+`platform` 取值：`alipay` | `wechat` | `h5`
+
+**后端根据 platform 走不同逻辑**：
+- `alipay` → `alipay.system.oauth.token` 换 `user_id`，存入 `alipayUserId`
+- `wechat` → `jscode2session` 换 `openid`，存入 `openid`
+- `h5` → 不需要平台授权
 
 **响应**：
 ```json
@@ -146,29 +152,6 @@ POST /api/auth/login
 
 ---
 
-### 获取订单
-
-```
-GET /api/orders?phone=13800138000
-```
-
-**响应**：
-```json
-{
-  "success": true,
-  "data": [
-    {
-      "orderId": "ORD20260316001",
-      "roomNumber": "悦享大床房 301",
-      "checkInDate": "2026-03-16",
-      "checkOutDate": "2026-03-18"
-    }
-  ]
-}
-```
-
----
-
 ## 数据表
 
 ### users 集合
@@ -176,8 +159,9 @@ GET /api/orders?phone=13800138000
 ```typescript
 {
   _id: string,
-  openid: string,        // 微信openid（唯一索引）
-  phone: string,         // 手机号（索引）
+  phone: string,              // 手机号（跨端唯一标识，索引）
+  openid?: string,            // 微信 openid
+  alipayUserId?: string,      // 支付宝 user_id（支付时作为 buyer_id）
   createdAt: Date,
   lastLoginAt: Date
 }
@@ -197,57 +181,28 @@ GET /api/orders?phone=13800138000
 
 ---
 
-## 前端实现
+## 改造计划
 
-### 相关文件
+### 后端
 
-| 文件 | 说明 |
-|------|------|
-| `pages/login/index.tsx` | 登录页 |
-| `pages/index/components/CheckInModal/index.tsx` | 办理入住弹窗（包含验证） |
-| `stores/useAppStore.ts` | 存储用户手机号 |
-| `hooks/useAuth.ts` | 认证相关 hook |
+1. `alipay.service.ts` — 新增 `getAlipayUserId(authCode)` 函数
+2. `db/users.ts` — User 接口加 `alipayUserId` 字段，新增查找/更新函数
+3. `auth.service.ts` — 根据 `platform` 路由到不同 OAuth 逻辑
+4. JWT payload 加入 `alipayUserId`，支付时直接从 token 取
 
-### 状态管理
+### 前端
 
-```typescript
-// stores/useAppStore.ts
-interface AppState {
-  phone: string | null
-  setPhone: (phone: string) => void
-}
-```
-
----
-
-## 后端实现
-
-### 相关文件
-
-| 文件 | 说明 |
-|------|------|
-| `routes/sms.ts` | 短信路由 |
-| `routes/auth.ts` | 认证路由 |
-| `routes/orders.ts` | 订单路由 |
-| `controllers/sms.controller.ts` | 短信控制器 |
-| `controllers/auth.controller.ts` | 认证控制器 |
-| `controllers/orders.controller.ts` | 订单控制器 |
-| `services/sms.service.ts` | 短信业务逻辑 + 阿里云短信 SDK |
-| `services/auth.service.ts` | 认证业务逻辑 + JWT 签发/验证 |
-| `services/wechat.service.ts` | 微信 API |
-| `db/sms.ts` | 验证码数据操作 |
-| `db/users.ts` | 用户数据操作 |
-| `db/orders.ts` | 订单数据操作 |
+1. `api/auth.ts` — 支付宝环境用 `my.getAuthCode` 获取 authCode，传给后端
 
 ---
 
 ## 测试数据
 
-开发阶段使用随机验证码，查看方式：
-1. 后端控制台会打印：`📱 验证码: 123456`
-2. 数据库 `sms_codes` 集合中查看
+开发阶段：
+- 测试手机号 `15290500792` 可跳过验证码和平台授权
+- 其他手机号需真实验证码（阿里云短信未接入前查数据库或后端日志）
 
 ```
-手机号：任意 11 位手机号
-验证码：后端控制台输出 / 数据库查询
+手机号：15290500792
+验证码：任意（mock 模式）
 ```

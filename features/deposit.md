@@ -1,6 +1,6 @@
 # 押金支付
 
-> 状态：✅ 完成（收钱吧接口 mock 中，待接入真实支付）
+> 状态：✅ 完成（收钱吧待申请，当前以支付宝直连运行）
 
 ---
 
@@ -20,15 +20,19 @@
 |------|------|------|
 | 支付路由 | ✅ 完成 | `routes/deposit.ts` |
 | 支付控制器 | ✅ 完成 | `controllers/deposit.controller.ts` |
-| 支付服务 | ✅ 完成（mock） | `services/deposit.service.ts` |
-| 收钱吧支付 SDK | ⬜ 待接入 | 待商户号申请完成 |
+| 支付服务 | ✅ 完成 | `services/deposit.service.ts` |
+| 支付宝直连 | 🔄 改造中 | `services/alipay.service.ts`，从 `alipay.trade.app.pay` 改为 `alipay.trade.create`（小程序支付需要 buyer_id） |
+| 收钱吧支付 SDK | ⬜ 待接入 | 待商户号申请完成后替换 |
 
 ### API
 
 | 接口 | 状态 |
 |------|------|
-| `POST /api/deposit/create` | ✅ 完成（mock tradeNO） |
-| `POST /api/deposit/confirm` | ✅ 完成（mock，真实环境由收钱吧回调） |
+| `POST /api/deposit/create` | 🔄 改造中（需改用 `alipay.trade.create`，传 `buyer_id`，返回 `trade_no`） |
+| `POST /api/deposit/notify` | ✅ 完成（验签，TRADE_SUCCESS/TRADE_FINISHED 更新押金状态） |
+| `GET /api/deposit/:orderId/status` | ✅ 完成（返回押金状态，前端支付后查询用） |
+
+> `/confirm` 接口已删除：状态更新由 `/notify` 负责，查询由 `/status` 负责，`/confirm` 存在安全隐患（前端可伪造支付成功）。
 
 ### 数据表
 
@@ -82,7 +86,7 @@
 | 账号 | 状态 |
 |------|------|
 | 个体工商户营业执照 | ⬜ 待办理 |
-| 支付宝商家号 | ⬜ 待申请 |
+| 支付宝商家号 | ✅ 已申请 |
 | 支付宝小程序 | ✅ 已创建（AppID: 2021006135620538） |
 | 收钱吧商户 | ⬜ 待申请 |
 
@@ -96,17 +100,12 @@
 - 支付宝个人主体可免费认证
 - 微信需企业认证（300元/年）才能使用支付功能
 
-### 支付通道：收钱吧（Shouqianba）
+### 支付通道
 
-选择收钱吧作为支付聚合服务，因为：
-- 支持支付宝、微信等多种支付方式
-- 费率 0.38%
-- 无需分别对接各支付平台 SDK
-- 个人商户可接入
+- **当前阶段**：后端通过 `alipay.service.ts` 调用支付宝 `alipay.trade.create` 创建交易（需传 `buyer_id`），返回 `trade_no`，前端用 `my.tradePay({ tradeNO })` 唤起支付。支付结果由 `/notify` 异步回调确认。
+- **目标阶段**：收钱吧（Shouqianba）聚合支付，统一支持支付宝/微信，由收钱吧服务端回调 `POST /api/deposit/notify` 自动确认。
 
-### 支付方式
-
-在支付宝小程序中，通过收钱吧 SDK 调起支付宝支付。
+> `buyer_id` 来自登录时获取的支付宝 `user_id`，存在用户表 `alipayUserId` 字段，支付时从 JWT 中取出。
 
 ---
 
@@ -177,24 +176,35 @@
 
 ## 支付流程
 
+### 当前阶段（支付宝小程序直连）
+
 ```
-小程序                         后端                        收钱吧
-  │                             │                            │
-  │── 1. POST /api/deposit/create ──▶│                        │
-  │      { orderId }            │                            │
-  │                             │──── 2. 预下单 ────────────▶│
-  │                             │◀─── 3. 返回支付参数 ────────│
-  │◀── 4. 返回支付参数 ──────────│                            │
-  │                             │                            │
-  │── 5. my.tradePay ──────────────────────────────────────▶│
-  │◀── 6. 支付结果 ────────────────────────────────────────│
-  │                             │                            │
-  │                             │◀─── 7. 支付回调 ───────────│
-  │                             │      POST /api/deposit/notify
-  │                             │                            │
-  │── 8. 查询支付状态 ──────────▶│                            │
-  │◀── 9. 返回门锁密码、WiFi ───│                            │
+小程序                              后端                        支付宝
+  │                                  │                            │
+  │─── 1. POST /api/deposit/create ─▶│                            │
+  │         { orderId }              │                            │
+  │                                  │   从 JWT 取 alipayUserId    │
+  │                                  │──── 2. alipay.trade.create ─▶│
+  │                                  │        (buyer_id)           │
+  │                                  │◀─── 3. 返回 trade_no ───────│
+  │◀─── 4. { tradeNO } ─────────────│                            │
+  │                                  │                            │
+  │─── 5. my.tradePay({ tradeNO }) ──────────────────────────▶│
+  │◀─── 6. 支付结果（前端回调） ───────────────────────────────│
+  │                                  │                            │
+  │                                  │◀─── 7. POST /api/deposit/notify（异步）─│
+  │                                  │         支付宝验签 → 更新状态 paid      │
+  │                                  │                            │
+  │─── 8. GET /api/deposit/:id/status（1.5s后查一次）─▶│         │
+  │◀─── 9. { status: 'paid' } ──────│                            │
+  │                                  │                            │
+  │─── 10. GET /api/orders/:id/room-info ──▶│                   │
+  │◀─── 11. 返回门锁密码、WiFi ─────│                            │
 ```
+
+### 目标阶段（收钱吧聚合支付，待申请）
+
+收钱吧接入后，步骤 2-4 改为通过收钱吧预下单，notify 改为收钱吧回调，支持支付宝/微信双通道。
 
 ---
 
@@ -225,13 +235,32 @@ POST /api/deposit/create
 
 ---
 
-### 支付回调
+### 支付宝异步通知
 
 ```
 POST /api/deposit/notify
 ```
 
-> 收钱吧服务器回调，更新订单押金状态
+> 支付宝服务器异步回调（当前阶段）；收钱吧接入后改为收钱吧回调。
+> 后端需验签，成功后将押金状态更新为 `paid`，返回字符串 `"success"` 给支付宝。
+
+---
+
+### 查询押金状态
+
+```
+GET /api/deposit/:orderId/status
+```
+
+**响应**：
+```json
+{
+  "status": "paid",
+  "paidAt": "2026-03-21T10:00:00Z"
+}
+```
+
+> 前端支付完成后轮询此接口，直到 `status === 'paid'` 再跳转入住成功页。
 
 ---
 
@@ -313,25 +342,33 @@ interface CheckInResult {
 
 ---
 
-## 后端实现（待开发）
+## 后端实现
 
 ### 文件规划
 
-| 文件 | 说明 |
-|------|------|
-| `routes/deposit.ts` | 支付路由 |
-| `controllers/deposit.controller.ts` | 支付控制器 |
-| `services/deposit.service.ts` | 支付业务逻辑 |
-| `services/shouqianba.ts` | 收钱吧支付 SDK 封装 |
+| 文件 | 状态 | 说明 |
+|------|------|------|
+| `routes/deposit.ts` | ✅ 完成 | 支付路由 |
+| `controllers/deposit.controller.ts` | ✅ 完成 | 支付控制器 |
+| `services/deposit.service.ts` | ✅ 完成 | 支付业务逻辑 |
+| `services/alipay.service.ts` | ✅ 完成 | 支付宝 SDK 封装（含验签） |
+| `services/shouqianba.ts` | ⬜ 待开发 | 收钱吧 SDK 封装，待商户号申请完成 |
 
 ---
 
 ## 环境变量
 
 ```bash
-# 收钱吧
-SQB_VENDOR_SN=xxx          # 服务商序列号
-SQB_VENDOR_KEY=xxx          # 服务商密钥
-SQB_TERMINAL_SN=xxx         # 终端序列号
-SQB_TERMINAL_KEY=xxx        # 终端密钥
+# 支付宝（当前使用）
+ALIPAY_APP_ID=xxx
+ALIPAY_PRIVATE_KEY=xxx
+ALIPAY_PUBLIC_KEY=xxx
+ALIPAY_NOTIFY_URL=https://your-domain.com/api/deposit/notify
+ALIPAY_GATEWAY=https://openapi.alipay.com/gateway.do  # 沙箱用 openapi.alipaydev.com
+
+# 收钱吧（待接入）
+SQB_VENDOR_SN=xxx
+SQB_VENDOR_KEY=xxx
+SQB_TERMINAL_SN=xxx
+SQB_TERMINAL_KEY=xxx
 ```

@@ -1,7 +1,7 @@
 # 后端服务
 
 > 路径：`/server`
-> 技术栈：Node.js + Express + TypeScript + 微信云托管 + 云开发数据库 + 阿里云短信
+> 技术栈：Node.js + Express + TypeScript + 云开发数据库 + 阿里云短信
 
 ## 相关文档
 
@@ -13,27 +13,30 @@
 ## 架构概览
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                     微信生态                             │
-│                                                         │
-│  ┌─────────────┐              ┌─────────────┐          │
-│  │  微信云托管  │──SDK连接──▶ │ 云开发数据库  │          │
-│  │  (Express)  │              │  (NoSQL)    │          │
-│  └──────┬──────┘              └─────────────┘          │
-│         │                                               │
-└─────────┼───────────────────────────────────────────────┘
-          │
-          │ wx.cloud.callContainer()
-          │ （内网通信，免域名免备案）
-          │
-┌─────────┴─────────┐          ┌──────────────────┐
-│   微信小程序       │          │    PMS 系统       │
-│                   │          │  （Webhook推送）   │
-└───────────────────┘          └────────┬─────────┘
-                                        │
-                                        ▼
-                               POST /api/webhook/pms
+┌──────────────┐         ┌─────────────────────────────┐
+│ 阿里云函数计算 │──SDK──▶ │ 腾讯云 CloudBase 数据库       │
+│   (FC)       │         │  (NoSQL，上海节点)            │
+│  Express     │         └─────────────────────────────┘
+└──────┬───────┘
+       │ HTTP 触发器（自带域名）
+       │
+┌──────┴───────┐          ┌──────────────────┐
+│ 支付宝小程序  │          │    PMS 系统       │
+│              │          │  （Webhook推送）   │
+└──────────────┘          └────────┬─────────┘
+                                   │
+                                   ▼
+                          POST /api/webhook/pms
 ```
+
+### 部署方案
+
+- **计算**：阿里云函数计算 FC（custom.debian10 运行时，HTTP 触发器，免费额度）
+- **数据库**：腾讯云 CloudBase 云开发数据库（永久免费额度，数据在上海）
+- **CI/CD**：GitHub Actions → `s deploy`（Serverless Devs CLI）
+- **域名**：`https://xiaoer-server-dodtzpbsbz.cn-shanghai.fcapp.run`
+
+> 历史：先后尝试过 CloudBase 云托管（CI 插件不兼容）、CloudBase 云函数（免费套餐不支持 HTTP），最终选择阿里云 FC。
 
 ---
 
@@ -67,7 +70,8 @@
 | `/api/checkin/:orderId` | GET | 查询入住记录（无记录返回 null） |
 | `/api/checkin/:orderId` | PUT | 更新入住记录 |
 | `/api/deposit/create` | POST | 创建押金支付订单 |
-| `/api/deposit/confirm` | POST | 确认押金支付（mock，真实环境由收钱吧回调） |
+| `/api/deposit/notify` | POST | 支付宝异步通知（验签 → 更新状态） |
+| `/api/deposit/:orderId/status` | GET | 查询押金状态 |
 | `/api/user/guests` | GET | 获取用户历史住客列表（开发中） |
 
 ---
@@ -80,13 +84,15 @@ TCB_ENV_ID=xxx
 TCB_SECRET_ID=xxx
 TCB_SECRET_KEY=xxx
 
+# 支付宝
+ALIPAY_APP_ID=xxx
+ALIPAY_PRIVATE_KEY=xxx
+ALIPAY_PUBLIC_KEY=xxx
+ALIPAY_NOTIFY_URL=xxx
+
 # 百居易 PMS
 HOSTEX_SESSION=xxx
 HOSTEX_OPERATOR_ID=xxx
-
-# 微信小程序
-WECHAT_APPID=xxx
-WECHAT_APP_SECRET=xxx
 
 # JWT
 JWT_SECRET=xxx
@@ -100,10 +106,28 @@ PORT=7001
 
 ## 部署
 
-```bash
-# 构建
-pnpm build
+### 阿里云函数计算 FC
 
-# 部署到云托管
-tcb framework deploy
+```bash
+# 本地构建 + 部署
+pnpm build
+s deploy -y
+
+# 或推送 main 分支，CI/CD 自动部署
+git push origin main
 ```
+
+- 运行时：`custom.debian10` + Node.js 层
+- Express 直接 `app.listen(9000)`，不需要 `serverless-http`
+- HTTP 触发器自带公网域名
+- 环境变量通过 `s.yaml` 配置，CI 从 GitHub Secrets 注入
+
+### CI/CD
+
+GitHub Actions 自动部署，配置文件：`.github/workflows/deploy.yml`
+推送 `main` 分支自动触发构建和部署。
+
+Secrets 需要配置：
+- `ALIYUN_ACCESS_KEY_ID`
+- `ALIYUN_ACCESS_KEY_SECRET`
+- 所有 `.env` 中的环境变量
