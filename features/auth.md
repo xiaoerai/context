@@ -1,6 +1,6 @@
 # 登录认证
 
-> 状态：🔄 改造中（支付宝授权 + 多端支持）
+> 状态：🔄 改造中（短信验证码待接入真实服务）
 
 ---
 
@@ -12,7 +12,7 @@
 |------|------|------|
 | 入住流程（含登录） | ✅ 完成 | `hooks/checkinFlow/usePhoneStep.ts` |
 | 状态管理 | ✅ 完成 | `stores/useAppStore.ts` |
-| 登录 API | 🔄 待改造 | `api/auth.ts`（需接入 `my.getAuthCode`） |
+| 登录 API | ✅ 完成 | `api/auth.ts`（支付宝用 `my.getAuthCode`） |
 
 ### 后端
 
@@ -20,17 +20,17 @@
 |------|------|------|
 | 短信路由 | ✅ 完成 | `routes/sms.ts` |
 | 认证路由 | ✅ 完成 | `routes/auth.ts` |
-| 认证服务 | 🔄 待改造 | `services/auth.service.ts`（需接入支付宝 OAuth） |
-| 支付宝 OAuth | ⬜ 待开发 | `services/alipay.service.ts`（新增 `getAlipayUserId`） |
+| 认证服务 | ✅ 完成 | `services/auth.service.ts`（多端 platform 路由已实现） |
+| 支付宝 OAuth | ✅ 完成 | `services/alipay.service.ts`（`getAlipayUserId` 已实现） |
 | 短信服务 | ✅ 完成 | `services/sms.service.ts`（阿里云短信未接入，开发阶段 mock）|
-| 数据库 | 🔄 待改造 | `db/users.ts`（需新增 `alipayUserId` 字段） |
+| 数据库 | ✅ 完成 | `db/users.ts`（phone 为唯一标识，alipayUserId 已添加） |
 
 ### API
 
 | 接口 | 状态 |
 |------|------|
 | `POST /api/sms/send` | ✅ 已联调 |
-| `POST /api/auth/login` | 🔄 待改造（需支持 `platform` + `authCode`） |
+| `POST /api/auth/login` | ✅ 已联调（支持 `platform` + `code` 参数） |
 | `GET /api/orders` | ✅ 已联调 |
 
 ---
@@ -181,25 +181,17 @@ POST /api/auth/login
 
 ---
 
-## 改造计划
+## 待办事项
 
-### 后端
-
-1. `alipay.service.ts` — 新增 `getAlipayUserId(authCode)` 函数
-2. `db/users.ts` — User 接口加 `alipayUserId` 字段，新增查找/更新函数
-3. `auth.service.ts` — 根据 `platform` 路由到不同 OAuth 逻辑
-4. JWT payload 加入 `alipayUserId`，支付时直接从 token 取
-
-### 前端
-
-1. `api/auth.ts` — 支付宝环境用 `my.getAuthCode` 获取 authCode，传给后端
+1. 接入阿里云短信真实服务（替换 mock 验证码）
+2. 微信小程序端 `wx.login()` 联调验证
 
 ---
 
 ## 测试数据
 
 开发阶段：
-- 测试手机号 `15290500792` 可跳过验证码和平台授权
+- 测试手机号 `15290500792` 可跳过验证码，但正常走平台授权（拿真实 alipayUserId）
 - 其他手机号需真实验证码（阿里云短信未接入前查数据库或后端日志）
 
 ```

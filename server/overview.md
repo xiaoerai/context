@@ -31,8 +31,9 @@
 
 ### 部署方案
 
-- **计算**：阿里云函数计算 FC（custom.debian10 运行时，HTTP 触发器，免费额度）
-- **数据库**：腾讯云 CloudBase 云开发数据库（永久免费额度，数据在上海）
+- **计算**：阿里云函数计算 FC（上海区域，custom.debian10 运行时 + Node.js 18 层，HTTP 触发器）
+- **数据库**：腾讯云 CloudBase 云开发数据库（仅数据库，计算不在 CloudBase；数据在上海）
+- **日志**：阿里云日志服务 SLS（project: xiaoer-logs，logstore: fc-logs）
 - **CI/CD**：GitHub Actions → `s deploy`（Serverless Devs CLI）
 - **域名**：`https://xiaoer-server-dodtzpbsbz.cn-shanghai.fcapp.run`
 
@@ -117,7 +118,7 @@ s deploy -y
 git push origin main
 ```
 
-- 运行时：`custom.debian10` + Node.js 层
+- 运行时：`custom.debian10` + Node.js 18 层
 - Express 直接 `app.listen(9000)`，不需要 `serverless-http`
 - HTTP 触发器自带公网域名
 - 环境变量通过 `s.yaml` 配置，CI 从 GitHub Secrets 注入

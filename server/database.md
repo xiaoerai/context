@@ -1,6 +1,6 @@
 # 数据表设计
 
-> 云开发数据库（NoSQL / MongoDB 风格）
+> 腾讯云开发数据库（NoSQL / MongoDB 风格），仅使用数据库服务，计算层已迁移至阿里云 FC
 
 ## 集合列表
 
@@ -18,8 +18,9 @@
 ```typescript
 {
   _id: string,
-  openid: string,           // 微信/支付宝openid（唯一索引）
-  phone: string,            // 手机号（索引）
+  phone: string,            // 手机号（唯一索引，跨端唯一标识）
+  openid?: string,          // 微信 openid
+  alipayUserId?: string,    // 支付宝用户ID
   guestIds?: string[],      // 关联的住客ID列表（按最近使用排序）
   createdAt: Date,
   lastLoginAt: Date

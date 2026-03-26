@@ -1,6 +1,6 @@
 # 押金支付
 
-> 状态：✅ 完成（收钱吧待申请，当前以支付宝直连运行）
+> 状态：✅ 完成（支付流程已测试通过，收钱吧待申请，当前以支付宝直连运行）
 
 ---
 
@@ -21,14 +21,14 @@
 | 支付路由 | ✅ 完成 | `routes/deposit.ts` |
 | 支付控制器 | ✅ 完成 | `controllers/deposit.controller.ts` |
 | 支付服务 | ✅ 完成 | `services/deposit.service.ts` |
-| 支付宝直连 | 🔄 改造中 | `services/alipay.service.ts`，从 `alipay.trade.app.pay` 改为 `alipay.trade.create`（小程序支付需要 buyer_id） |
+| 支付宝直连 | ✅ 完成 | `services/alipay.service.ts`（`alipay.trade.create` + `buyer_id`） |
 | 收钱吧支付 SDK | ⬜ 待接入 | 待商户号申请完成后替换 |
 
 ### API
 
 | 接口 | 状态 |
 |------|------|
-| `POST /api/deposit/create` | 🔄 改造中（需改用 `alipay.trade.create`，传 `buyer_id`，返回 `trade_no`） |
+| `POST /api/deposit/create` | ✅ 完成（auth 中间件校验 JWT，取 `alipayUserId` 作为 `buyer_id`） |
 | `POST /api/deposit/notify` | ✅ 完成（验签，TRADE_SUCCESS/TRADE_FINISHED 更新押金状态） |
 | `GET /api/deposit/:orderId/status` | ✅ 完成（返回押金状态，前端支付后查询用） |
 
