@@ -1,6 +1,6 @@
-# 退房申请
+# 退房与退款
 
-> 状态：⬜ 待开发
+> 状态：🔄 开发中
 
 ---
 
@@ -10,69 +10,68 @@
 
 | 模块 | 状态 | 文件 |
 |------|------|------|
-| 退房申请页 | ⬜ 待开发 | `pages/checkout/index.tsx` |
+| StayCard 改造 | ⬜ 待开发 | `pages/index/components/StayCard/index.tsx` |
+| 删除 currentStay，改用 checkinRecord | ⬜ 待开发 | `stores/slices/hotelSlice.ts`、`checkinSlice.ts` |
+| 退房确认弹窗 | ⬜ 待开发 | StayCard 内弹窗 |
 
 ### 后端
 
 | 模块 | 状态 | 文件 |
 |------|------|------|
-| 退房路由 | ⬜ 待开发 | `routes/checkout.ts` |
-| 退房控制器 | ⬜ 待开发 | `controllers/checkout.controller.ts` |
-| 退房服务 | ⬜ 待开发 | `services/checkout.service.ts` |
+| 退房接口 | ⬜ 待开发 | `controllers/checkout.controller.ts` |
+| 退款接口 | ⬜ 待开发 | `controllers/deposit.controller.ts` |
+| 支付宝退款 | ⬜ 待开发 | `services/alipay.service.ts` |
 
 ### API
 
-| 接口 | 状态 |
-|------|------|
-| `POST /api/checkout` | ⬜ 待开发 |
-| `GET /api/orders/:id/checkout-status` | ⬜ 待开发 |
-| `POST /api/admin/checkout/confirm` | ⬜ 待开发 |
-| `POST /api/deposit/refund` | ⬜ 待开发 |
-
-### 数据表
-
-| 集合 | 状态 |
-|------|------|
-| orders (退房/退款字段) | ⬜ 待扩展 |
+| 接口 | 方法 | 状态 | 说明 |
+|------|------|------|------|
+| `/api/checkin/:orderId` | GET | ✅ 已有 | 查询入住状态，StayCard 数据来源 |
+| `/api/checkout` | POST | ⬜ 待开发 | 客户提交退房 |
+| `/api/deposit/refund` | POST | ⬜ 待开发 | 老板端退款操作 |
 
 ---
 
 ## 概述
 
-用户入住后可申请退房，等待房东确认后退还押金。
+用户入住后，在首页 StayCard 点「退房」提交退房申请，老板在管理端确认后退还押金（支持部分退款）。
+
+---
+
+## StayCard 改造
+
+### 现状
+- 数据来源：`currentStay`（mock 硬编码）
+- 按钮：「详情」+「开门密码」
+
+### 改造后
+- 数据来源：`checkinRecord`（从后端 `/api/checkin/:orderId` 拉取）
+- 按钮：「开门密码」+「退房」
+- 房间名右侧显示 Wi-Fi 信息
+- 删除 `currentStay` 和 `StayInfo` 类型，全部用 `CheckinRecord`
+
+### 显示逻辑
+- 有 `checkinRecord` 且 `status = checked_in` → 显示 StayCard
+- `status = checkout_pending` → StayCard 显示「待确认退房」
+- `status = checked_out` / `refunded` → 不显示或显示已退房
+- 无记录 → 不显示 StayCard
 
 ---
 
 ## 用户流程
 
 ```
-入住成功页 / 首页「当前入住」
-      ↓ 点击「申请退房」
-┌─────────────────────────────────┐
-│         退房申请页               │
-│  ┌─────────────────────────┐    │
-│  │ 房间：301室              │    │
-│  │ 入住：2026-03-09        │    │
-│  │ 退房：2026-03-11        │    │
-│  └─────────────────────────┘    │
-│                                 │
-│  ┌─────────────────────────┐    │
-│  │ 押金：¥500.00           │    │
-│  │ 状态：待检查             │    │
-│  └─────────────────────────┘    │
-│                                 │
-│       [确认申请退房]             │
-└─────────────────────────────────┘
-      ↓ 提交申请
-┌─────────────────────────────────┐
-│         等待确认                 │
-│                                 │
-│  房东正在检查房间...             │
-│                                 │
-│  押金将在确认后原路退回           │
-└─────────────────────────────────┘
-      ↓ 房东确认
-押金退还，订单完成
+首页 StayCard
+  ├── 开门密码按钮 → 显示门锁密码
+  └── 退房按钮 → 退房确认弹窗
+        ↓ 确认
+  POST /api/checkout
+        ↓
+  状态变为 checkout_pending
+  StayCard 显示「待确认退房」
+        ↓ 老板确认并退款
+  押金原路退回支付宝
+  状态变为 refunded
 ```
 
 ---
@@ -81,48 +80,23 @@
 
 ```
 checked_in (已入住)
-      ↓ 用户申请退房
+      ↓ 用户点「退房」
 checkout_pending (待检查)
-      ↓ 房东确认
+      ↓ 老板确认退房
 checked_out (已退房)
-      ↓ 系统退款
+      ↓ 老板操作退款（可调整金额）
 refunded (已退款)
 ```
 
 ---
 
-## 页面设计
-
-### 退房申请页 (checkout)
-
-**路径**：`pages/checkout`
-
-**展示内容**：
-| 内容 | 说明 |
-|------|------|
-| 房间信息 | 房间号 |
-| 入住日期 | YYYY-MM-DD |
-| 退房日期 | YYYY-MM-DD |
-| 押金金额 | 已支付的押金 |
-| 退房状态 | 待检查 / 已退房 |
-
-**状态展示**：
-
-| 状态 | 显示 | 操作 |
-|------|------|------|
-| checked_in | 可申请退房 | 显示「申请退房」按钮 |
-| checkout_pending | 待检查 | 显示等待提示 |
-| checked_out | 已退房 | 显示退款进度 |
-| refunded | 已退款 | 显示完成信息 |
-
----
-
 ## API 接口
 
-### 申请退房
+### 提交退房
 
 ```
 POST /api/checkout
+Authorization: Bearer <token>
 ```
 
 **请求**：
@@ -136,154 +110,100 @@ POST /api/checkout
 ```json
 {
   "success": true,
-  "status": "checkout_pending"
+  "data": {
+    "status": "checkout_pending"
+  }
 }
 ```
+
+**逻辑**：
+- 验证订单存在且 status = checked_in
+- 更新 status 为 checkout_pending
+- 记录 checkoutAppliedAt
 
 ---
 
-### 查询退房状态
+### 退款（老板端）
 
 ```
-GET /api/orders/:id/checkout-status
-```
-
-**响应**：
-```json
-{
-  "status": "checkout_pending",
-  "depositAmount": 50000,
-  "refundStatus": null
-}
-```
-
-或（已退款）：
-```json
-{
-  "status": "refunded",
-  "depositAmount": 50000,
-  "refundStatus": "success",
-  "refundedAt": "2026-03-11T14:00:00Z"
-}
-```
-
----
-
-### 房东确认退房（管理后台调用）
-
-```
-POST /api/admin/checkout/confirm
+POST /api/deposit/refund
+Authorization: Bearer <token>  (需要管理员权限)
 ```
 
 **请求**：
 ```json
 {
   "orderId": "ORD20260309001",
-  "approved": true,
-  "deduction": 0
+  "refundAmount": 50000
 }
 ```
 
 **说明**：
-- `approved`: 是否同意退房
-- `deduction`: 扣款金额（分），如有损坏
+- `refundAmount`：退款金额（分），可以小于押金（部分退款）
+- 不传 `refundAmount` 默认全额退款
 
----
-
-### 退款（系统自动）
-
-房东确认后，系统自动调用微信退款接口：
-
+**响应**：
+```json
+{
+  "success": true,
+  "data": {
+    "refundAmount": 50000,
+    "status": "refunded"
+  }
+}
 ```
-POST /api/deposit/refund
-```
+
+**逻辑**：
+1. 从押金记录取 `transactionId`（支付宝交易号）
+2. 调 `alipay.trade.refund` 原路退款
+3. 更新押金记录状态为 refunded
+4. 更新入住记录状态为 checked_out
 
 ---
 
 ## 数据模型
 
-### 退房状态
-
-```typescript
-type CheckoutStatus =
-  | 'checked_in'        // 已入住
-  | 'checkout_pending'  // 申请退房，待检查
-  | 'checked_out'       // 已退房
-  | 'refunded'          // 已退款
-```
-
-### 退款信息
-
-```typescript
-interface RefundInfo {
-  refundAmount: number    // 实际退款金额（分）
-  deduction: number       // 扣款金额（分）
-  refundStatus: string    // pending / success / failed
-  refundedAt: Date        // 退款时间
-  refundId: string        // 微信退款单号
-}
-```
-
----
-
-## 数据表
-
-### orders 集合（更新字段）
+### 入住记录 check_in_records（更新字段）
 
 ```typescript
 {
-  // ... 其他字段
-  status: string,           // checked_in → checkout_pending → checked_out
-  checkoutAppliedAt: Date,  // 申请退房时间
-  checkoutConfirmedAt: Date,// 房东确认时间
+  // ... 已有字段
+  status: 'pending' | 'checked_in' | 'checkout_pending' | 'checked_out'
+  checkoutAppliedAt?: Date    // 申请退房时间
+}
+```
 
-  // 退款相关
-  refundStatus: string,     // pending / success / failed
-  refundAmount: number,     // 实际退款金额（分）
-  refundDeduction: number,  // 扣款金额（分）
-  refundedAt: Date,         // 退款时间
-  refundId: string,         // 微信退款单号
+### 押金记录 deposits（更新字段）
+
+```typescript
+{
+  // ... 已有字段
+  status: 'created' | 'paid' | 'refunded' | 'partial_refund'
+  payerUserId?: string        // 支付者平台用户ID（已有）
+  refundAmount?: number       // 实际退款金额（分）
+  refundedAt?: Date           // 退款时间
+  refundTradeNo?: string      // 支付宝退款交易号
 }
 ```
 
 ---
 
-## 前端实现（待开发）
-
-### 文件规划
-
-| 文件 | 说明 |
-|------|------|
-| `pages/checkout/index.tsx` | 退房申请页 |
-
-### 入口
-
-1. 入住成功页 → 「申请退房」按钮
-2. 首页 StayCard（当前入住卡片） → 「申请退房」
-
----
-
-## 后端实现（待开发）
-
-### 文件规划
+## 后端文件规划
 
 | 文件 | 说明 |
 |------|------|
 | `routes/checkout.ts` | 退房路由 |
 | `controllers/checkout.controller.ts` | 退房控制器 |
-| `services/checkout.service.ts` | 退房业务逻辑 |
+| `services/alipay.service.ts` | 新增 refundTrade 函数 |
+| `controllers/deposit.controller.ts` | 新增 refund handler |
 
 ---
 
-## 通知机制（可选）
+## 前端改动
 
-### 房东通知
-
-用户申请退房时，通知房东：
-- 微信模板消息
-- 或短信通知
-
-### 用户通知
-
-押金退还后，通知用户：
-- 微信模板消息
+| 文件 | 改动 |
+|------|------|
+| `stores/slices/hotelSlice.ts` | 删除 `currentStay`、`StayInfo` |
+| `stores/slices/checkinSlice.ts` | StayCard 数据来源 |
+| `pages/index/components/StayCard/index.tsx` | 改用 checkinRecord，改按钮，加 Wi-Fi |
+| `pages/index/index.tsx` | 去掉 mock 数据，加载时拉 checkinRecord |
