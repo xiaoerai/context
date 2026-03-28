@@ -19,13 +19,13 @@
 {
   _id: string,
   phone: string,            // 手机号（唯一索引，跨端唯一标识）
-  openid?: string,          // 微信 openid
-  alipayUserId?: string,    // 支付宝用户ID
   guestIds?: string[],      // 关联的住客ID列表（按最近使用排序）
   createdAt: Date,
   lastLoginAt: Date
 }
 ```
+
+> 注：平台用户ID（alipayUserId / openid）只存在 JWT 中，不存数据库
 
 ## sms_codes 集合
 
@@ -41,17 +41,18 @@
 
 ## check_in_records 集合
 
-> 入住记录（订单从百居易实时查询，不存本地）
+> 入住记录（订单从 PMS 实时查询，不存本地）
 
 ```typescript
 {
   _id: string,
-  hostexOrderId: string,    // 百居易订单ID（唯一索引）
-  roomId: string,           // 百居易房型ID
-  roomName: string,         // 房间名称
+  hostexOrderId: string,    // PMS 订单ID（唯一索引）
+  roomNumber: string,       // 房间号（关联 rooms 表，如 "301"）
+  roomName: string,         // 房间名称（冗余，方便显示）
   phone: string,            // 入住人手机号（索引）
   checkInDate: string,      // YYYY-MM-DD
   checkOutDate: string,
+  source?: string,          // 订单来源 OTA 平台（meituan / ctrip / douyin / manual）
   guestIds: string[],       // 住客ID列表
   depositId?: string,       // 关联押金记录ID
   depositPaid: boolean,     // 是否已支付押金
@@ -82,8 +83,9 @@
   amount: number,           // 金额（分）
   channel: string,          // 支付渠道：alipay / wechat
   status: string,           // created / paid / refunded
-  tradeNO?: string,         // 收钱吧/支付宝交易号
+  tradeNO?: string,         // 支付宝交易号
   transactionId?: string,   // 支付回调的交易流水号
+  payerUserId?: string,     // 支付者的平台用户ID（退款用）
   paidAt?: Date,            // 支付时间
   refundedAt?: Date,        // 退款时间
   createdAt: Date,
@@ -96,14 +98,26 @@
 ```typescript
 {
   _id: string,
-  hotelId: string,          // 民宿ID（索引）
-  roomNumber: string,
-  doorCode: string,
-  wifiName: string,
-  wifiPassword: string,
-  deposit: number           // 押金（分）
+  roomNumber: string,       // 房间号（唯一标识，如 "301"）
+  roomName: string,         // 房间名（如 "301 轻旅｜投影大床房"）
+  doorCode: string,         // 门锁密码
+  wifiName: string,         // WiFi 名称
+  wifiPassword: string,     // WiFi 密码
+  deposit: number,          // 押金金额（分）
+  status: string,           // available / occupied / dirty
+
+  // 第三方平台关联（支持多 PMS）
+  thirdparty: [
+    { platform: string, houseId: string }
+    // 如 { platform: "hostex", houseId: "12556371" }
+    // 如 { platform: "fliggy", houseId: "FL_98765" }
+  ]
 }
 ```
+
+> 房间状态流转：available → occupied（支付成功）→ dirty（退房）→ available（打扫完成）
+>
+> 入住时：前端传 platformRoomId + platform，后端查 thirdparty 映射拿到 roomNumber
 
 ---
 
