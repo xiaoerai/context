@@ -1,6 +1,6 @@
 # 办理入住
 
-> 状态：✅ 完成（前端） / ⬜ 待开发（后端API）
+> 状态：✅ 基本完成（入住 + 押金支付已联调通过）
 
 ---
 
@@ -10,261 +10,160 @@
 
 | 模块 | 状态 | 文件 |
 |------|------|------|
-| 办理入住弹窗 | ✅ 完成 | `pages/index/components/CheckInModal/index.tsx` |
+| 入住流程 Hook | ✅ 完成 | `hooks/checkinFlow/index.tsx` |
+| 手机号验证步骤 | ✅ 完成 | `hooks/checkinFlow/usePhoneStep.ts` |
+| 订单选择步骤 | ✅ 完成 | `hooks/checkinFlow/useOrdersStep.ts` |
+| 押金支付步骤 | ✅ 完成 | `hooks/checkinFlow/useDepositStep.ts` |
 | 入住信息页 | ✅ 完成 | `pages/checkin/index.tsx` |
-| 顶部导航 | ✅ 完成 | `pages/checkin/components/NavBar/index.tsx` |
+| 住客选择 | ✅ 完成 | `pages/checkin/components/GuestPicker/index.tsx` |
 | 表单区域 | ✅ 完成 | `pages/checkin/components/FormSection/index.tsx` |
 | 上传区域 | ✅ 完成 | `pages/checkin/components/UploadSection/index.tsx` |
 | OCR 识别 | ✅ 完成 | `utils/ocr.ts` |
 | 表单验证 | ✅ 完成 | `utils/schemas.ts` |
+| StayCard | ✅ 完成 | `pages/index/components/StayCard/index.tsx` |
 
 ### 后端
 
 | 模块 | 状态 | 文件 |
 |------|------|------|
-| 入住路由 | ⬜ 待开发 | `routes/checkin.ts` |
-| 入住控制器 | ⬜ 待开发 | `controllers/checkin.controller.ts` |
-| 入住服务 | ⬜ 待开发 | `services/checkin.service.ts` |
+| 入住路由 | ✅ 完成 | `routes/checkin.ts` |
+| 入住控制器 | ✅ 完成 | `controllers/checkin.controller.ts` |
+| 入住服务 | ✅ 完成 | `services/checkin.service.ts` |
+| 退房接口 | ✅ 完成 | `services/checkin.service.ts` (checkout) |
+| 房间同步 | ✅ 完成 | `controllers/rooms.controller.ts` |
 
 ### API
 
-| 接口 | 状态 |
-|------|------|
-| `POST /api/checkin` | ⬜ 待开发 |
+| 接口 | 状态 | 说明 |
+|------|------|------|
+| `POST /api/checkin` | ✅ 完成 | 创建入住记录 |
+| `GET /api/checkin/:orderId` | ✅ 完成 | 查询入住记录 |
+| `PUT /api/checkin/:orderId` | ✅ 完成 | 更新入住记录 |
+| `POST /api/checkin/checkout` | ✅ 完成 | 退房 |
+| `POST /api/rooms/sync` | ✅ 完成 | 从 PMS 同步房间 |
+| `GET /api/rooms` | ✅ 完成 | 获取房间列表 |
 
-### 数据表
+### 待改造
 
-| 集合 | 状态 |
+| 改动 | 说明 |
 |------|------|
-| guests | ⬜ 待创建 |
+| 入住记录 `roomId` → `roomNumber` | 用房间号关联 rooms 表，不依赖第三方 ID |
+| 入住时传 `platformRoomId` + `platform` | 后端查 rooms 表 thirdparty 映射拿 roomNumber |
+| 入住记录加 `source` 字段 | 记录订单来源 OTA 平台 |
+| 支付成功 → 房间状态改 `occupied` | 在 handleAlipayNotify 中联动 |
+| 退房 → 房间状态改 `dirty` | 在 checkout 中联动 |
 
 ---
 
-## 概述
-
-用户办理入住的完整流程，包括：
-1. 验证身份（手机号+验证码）
-2. 选择当日订单
-3. 填写入住信息（身份证OCR）
-4. 提交入住信息
-
----
-
-## 用户流程
+## 完整流程
 
 ```
-┌─────────────────────────────────┐
-│  Step 1: 验证手机号              │
-│  ┌─────────────────────────┐    │
-│  │ 手机号: [___________]   │    │
-│  │ 验证码: [____] [获取]   │    │
-│  │                         │    │
-│  │      [下一步]           │    │
-│  └─────────────────────────┘    │
-└─────────────────────────────────┘
-              ↓ 验证通过
-┌─────────────────────────────────┐
-│  Step 2: 选择订单                │
-│  ┌─────────────────────────┐    │
-│  │ 🏠 301室                │    │
-│  │ 3月9日 - 3月11日        │    │
-│  └─────────────────────────┘    │
-│  ┌─────────────────────────┐    │
-│  │ 🏠 502室                │    │
-│  │ 3月9日 - 3月10日        │    │
-│  └─────────────────────────┘    │
-└─────────────────────────────────┘
-              ↓ 点击选择
-┌─────────────────────────────────┐
-│  Step 3: 入住信息页              │
-│  ┌─────────────────────────┐    │
-│  │ [上传身份证正面]         │    │
-│  │     (OCR自动识别)        │    │
-│  └─────────────────────────┘    │
-│  ┌─────────────────────────┐    │
-│  │ 姓名: [___________]     │    │
-│  │ 身份证号: [___________] │    │
-│  │ 手机号: [___________]   │    │
-│  └─────────────────────────┘    │
-│        [提交入住信息]            │
-└─────────────────────────────────┘
-              ↓ 提交成功
-        跳转押金支付页
+1. 用户登录（手机号 + 平台授权）
+
+2. 查询订单
+   → 后端从 PMS 拉订单，返回 orderId、roomName、houseId、日期、source
+
+3. 用户选订单
+   → 查 GET /api/checkin/:orderId
+   → 有记录：跳到押金或成功页
+   → 没记录：跳到入住页
+
+4. 填写住客信息，提交入住
+   → POST /api/checkin { orderId, platformRoomId, platform, roomName, phone, guest, source }
+   → 后端查 rooms 表 thirdparty 映射 → 拿到 roomNumber
+   → 创建入住记录（status: pending）
+   → 创建住客记录
+
+5. 支付押金
+   → POST /api/deposit/create { orderId, channel: "alipay" }
+   → 返回 tradeNO → 前端调 my.tradePay 唤起支付
+
+6. 支付宝回调
+   → POST /api/deposit/notify
+   → 入住记录 → checked_in
+   → 房间状态 → occupied
+
+7. 退房
+   → POST /api/checkin/checkout { orderId }
+   → 入住记录 → checked_out
+   → 房间状态 → dirty
+
+8. 打扫完成（老板端）
+   → 房间状态 → available
+
+9. 退款（老板端）
+   → POST /api/deposit/refund
 ```
 
 ---
 
-## 功能模块
+## 房间状态流转
 
-### 1. 办理入住弹窗 (CheckInModal)
-
-**位置**：首页 → 点击「办理入住」
-
-**Step 1 - 手机号验证**：
-- 手机号输入框（11位）
-- 验证码输入框（4-6位）
-- 获取验证码按钮（60秒倒计时）
-
-**Step 2 - 选择订单**：
-- 验证通过后显示当日订单列表
-- 订单卡片：房间号、入住日期、退房日期
-- 无订单时提示"该手机号今日无待办理订单"
-- 可返回 Step 1 更换手机号
-
----
-
-### 2. 入住信息页 (checkin)
-
-**路径**：`pages/checkin`
-
-**表单字段**：
-| 字段 | 必填 | 验证规则 |
-|------|------|----------|
-| 姓名 | 是 | 非空 |
-| 身份证号 | 是 | 18位有效格式 |
-| 手机号 | 是 | 11位数字 |
-
-**上传内容**：
-- 身份证正面（可选，OCR自动识别填充表单）
-
-**OCR 识别**：
-- 拍照/选择图片后自动调用 OCR
-- 识别成功自动填充姓名和身份证号
-- 识别失败可手动填写
+```
+available → occupied（支付成功回调）→ dirty（退房）→ available（打扫完成）
+```
 
 ---
 
 ## 数据模型
 
-### 入住信息
+### 入住记录
 
 ```typescript
-interface GuestInfo {
-  name: string           // 姓名
-  idNumber: string       // 身份证号
-  phone: string          // 手机号
-  idCardFrontUrl?: string // 身份证正面照片URL
-}
-```
-
-### 订单信息
-
-```typescript
-interface Order {
-  orderId: string        // 订单ID
-  roomNumber: string     // 房间号
-  checkInDate: string    // 入住日期 YYYY-MM-DD
-  checkOutDate: string   // 退房日期 YYYY-MM-DD
-  depositStatus: string  // 押金状态: unpaid / paid / refunded
-  status: string         // 订单状态: pending / checked_in / checked_out
-}
-```
-
----
-
-## API 接口
-
-### 获取订单列表
-
-> 已在登录接口返回，无需单独请求
-
----
-
-### 提交入住信息
-
-```
-POST /api/checkin
-```
-
-> 状态：⬜ 待开发
-
-**请求**：
-```json
 {
-  "orderId": "ORD20260309001",
-  "guests": [
-    {
-      "name": "张三",
-      "idNumber": "110101199001011234",
-      "phone": "13800138000",
-      "idCardFrontUrl": "https://..."
-    }
+  hostexOrderId: string,    // PMS 订单ID
+  roomNumber: string,       // 房间号（关联 rooms 表）
+  roomName: string,         // 房间名（冗余显示）
+  phone: string,            // 入住人手机号
+  checkInDate: string,      // YYYY-MM-DD
+  checkOutDate: string,
+  source?: string,          // OTA 来源（meituan / ctrip / douyin / manual）
+  guestIds: string[],       // 住客ID列表
+  depositId?: string,       // 押金记录ID
+  depositPaid: boolean,
+  status: string,           // pending / checked_in / checked_out
+}
+```
+
+### 房间
+
+```typescript
+{
+  roomNumber: string,       // 唯一标识
+  roomName: string,
+  doorCode: string,
+  wifiName: string,
+  wifiPassword: string,
+  deposit: number,          // 押金（分）
+  status: string,           // available / occupied / dirty
+  thirdparty: [             // 多 PMS 映射
+    { platform: string, houseId: string }
   ]
 }
 ```
 
-**响应**：
-```json
-{
-  "success": true,
-  "depositAmount": 50000,
-  "depositStatus": "unpaid"
-}
-```
-
----
-
-## 前端实现
-
-### 相关文件
-
-| 文件 | 说明 |
-|------|------|
-| `pages/index/components/CheckInModal/index.tsx` | 办理入住弹窗 |
-| `pages/checkin/index.tsx` | 入住信息页 |
-| `pages/checkin/components/NavBar/index.tsx` | 顶部导航 |
-| `pages/checkin/components/FormSection/index.tsx` | 表单区域 |
-| `pages/checkin/components/UploadSection/index.tsx` | 上传区域 |
-| `utils/ocr.ts` | 身份证OCR识别 |
-| `utils/schemas.ts` | Zod验证规则 |
-
-### 验证规则
+### 住客
 
 ```typescript
-// utils/schemas.ts
-import { z } from 'zod'
-
-export const guestSchema = z.object({
-  name: z.string().min(1, '请输入姓名'),
-  idNumber: z.string().regex(/^\d{17}[\dXx]$/, '请输入有效身份证号'),
-  phone: z.string().regex(/^1\d{10}$/, '请输入有效手机号'),
-})
-```
-
----
-
-## 后端实现
-
-### 待开发文件
-
-| 文件 | 说明 |
-|------|------|
-| `routes/checkin.ts` | 入住路由 |
-| `controllers/checkin.controller.ts` | 入住控制器 |
-| `services/checkin.service.ts` | 入住业务逻辑 |
-
-### 数据表
-
-**guests 集合**：
-```typescript
 {
-  _id: string,
-  orderId: string,       // 订单ID（索引）
   name: string,
-  idNumber: string,
-  phone: string,
-  idCardFrontUrl: string,
+  idNumber: string,         // 身份证号（去重依据）
+  idImageUrl?: string,
   createdAt: Date
 }
 ```
 
 ---
 
-## 路由保护
+## 开发环境
 
-入住信息页需要验证用户已选择订单：
+- `SKIP_DEPOSIT` 变量可跳过押金支付（`config/dev.ts` 中配置）
+- 测试手机号 `15290500792` 跳过验证码
+- mock 订单在测试手机号下自动返回
 
-```typescript
-// hooks/useOrderAuth.ts
-// 检查是否有选中的订单，无则跳回首页
-```
+---
+
+## 安全待办
+
+- 入住不强制要求先付押金（pending 状态不检查押金），后续需改为押金支付后才算入住成功
+- 短信验证码服务待接入（目前测试手机号跳过）
