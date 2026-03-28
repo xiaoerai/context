@@ -317,7 +317,7 @@ TCB_SECRET_KEY=xxx
 | 任务 | 状态 | 说明 |
 |------|------|------|
 | 实时查询 Hostex 订单 | ✅ 完成 | 通过 `GET /api/orders` 实时从 PMS 拉取 |
-| 订单数据含来源信息 | ✅ 完成 | 返回 source（OTA: meituan/ctrip/douyin/manual）、pms("hostex")、pmsRoomId |
+| 订单数据含来源信息 | ✅ 完成 | 返回 ota（OTA: meituan/ctrip/douyin/manual）、pms("hostex")、pmsRoomId |
 | 测试手机号 mock 订单 | ✅ 完成 | 15290500792 返回 mock 订单 |
 | 本地同步服务 | ⬜ 暂不需要 | 当前实时查询够用 |
 | Session 过期监控 | ⬜ 待开发 | |

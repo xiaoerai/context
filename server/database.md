@@ -52,7 +52,7 @@
   phone: string,            // 入住人手机号（索引）
   checkInDate: string,      // YYYY-MM-DD
   checkOutDate: string,
-  source?: string,          // 订单来源 OTA 平台（meituan / ctrip / douyin / manual）
+  ota?: string,          // 订单来源 OTA 平台（meituan / ctrip / douyin / manual）
   guestIds: string[],       // 住客ID列表
   depositId?: string,       // 关联押金记录ID
   depositPaid: boolean,     // 是否已支付押金

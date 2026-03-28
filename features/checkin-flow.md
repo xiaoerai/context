@@ -49,11 +49,11 @@
 |------|------|
 | 入住记录 `roomId` → `roomNumber` | ✅ 用房间号关联 rooms 表，不依赖第三方 ID |
 | 入住时传 `pmsRoomId` + `pms` | ✅ 后端查 rooms 表 pms 映射拿 roomNumber |
-| 入住记录加 `source` 字段 | ✅ 记录订单来源 OTA 平台 |
+| 入住记录加 `ota` 字段 | ✅ 记录订单来源 OTA 平台 |
 | 支付成功 → 房间状态改 `occupied` | ✅ 在 handleAlipayNotify 中联动 |
 | 退房 → 房间状态改 `dirty` | ✅ 在 checkout 中联动 |
 | rooms 表改用 `pms` 数组映射 | ✅ 支持多 PMS 平台 |
-| 订单数据加 `source`/`pms`/`pmsRoomId` | ✅ 从 Hostex 返回平台信息 |
+| 订单数据加 `ota`/`pms`/`pmsRoomId` | ✅ 从 Hostex 返回平台信息 |
 
 ### 待开发
 
@@ -72,7 +72,7 @@
 1. 用户登录（手机号 + 平台授权）
 
 2. 查询订单
-   → 后端从 PMS 拉订单，返回 orderId、roomName、houseId、日期、source
+   → 后端从 PMS 拉订单，返回 orderId、roomName、houseId、日期、ota
 
 3. 用户选订单
    → 查 GET /api/checkin/:orderId
@@ -80,7 +80,7 @@
    → 没记录：跳到入住页
 
 4. 填写住客信息，提交入住
-   → POST /api/checkin { orderId, pmsRoomId, pms, roomName, phone, guest, source }
+   → POST /api/checkin { orderId, pmsRoomId, pms, roomName, phone, guest, ota }
    → 后端查 rooms 表 pms 映射 → 拿到 roomNumber
    → 创建入住记录（status: pending）
    → 创建住客记录
@@ -128,7 +128,7 @@ available → occupied（支付成功回调）→ dirty（退房）→ available
   phone: string,            // 入住人手机号
   checkInDate: string,      // YYYY-MM-DD
   checkOutDate: string,
-  source?: string,          // OTA 来源（meituan / ctrip / douyin / manual）
+  ota?: string,          // OTA 来源（meituan / ctrip / douyin / manual）
   guestIds: string[],       // 住客ID列表
   depositId?: string,       // 押金记录ID
   depositPaid: boolean,
