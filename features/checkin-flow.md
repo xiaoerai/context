@@ -48,7 +48,7 @@
 | 改动 | 说明 |
 |------|------|
 | 入住记录 `roomId` → `roomNumber` | 用房间号关联 rooms 表，不依赖第三方 ID |
-| 入住时传 `platformRoomId` + `platform` | 后端查 rooms 表 thirdparty 映射拿 roomNumber |
+| 入住时传 `pmsRoomId` + `pms` | 后端查 rooms 表 pms 映射拿 roomNumber |
 | 入住记录加 `source` 字段 | 记录订单来源 OTA 平台 |
 | 支付成功 → 房间状态改 `occupied` | 在 handleAlipayNotify 中联动 |
 | 退房 → 房间状态改 `dirty` | 在 checkout 中联动 |
@@ -69,8 +69,8 @@
    → 没记录：跳到入住页
 
 4. 填写住客信息，提交入住
-   → POST /api/checkin { orderId, platformRoomId, platform, roomName, phone, guest, source }
-   → 后端查 rooms 表 thirdparty 映射 → 拿到 roomNumber
+   → POST /api/checkin { orderId, pmsRoomId, pms, roomName, phone, guest, source }
+   → 后端查 rooms 表 pms 映射 → 拿到 roomNumber
    → 创建入住记录（status: pending）
    → 创建住客记录
 
@@ -136,8 +136,8 @@ available → occupied（支付成功回调）→ dirty（退房）→ available
   wifiPassword: string,
   deposit: number,          // 押金（分）
   status: string,           // available / occupied / dirty
-  thirdparty: [             // 多 PMS 映射
-    { platform: string, houseId: string }
+  pms: [                    // 多 PMS 映射
+    { platform: string, roomId: string }
   ]
 }
 ```

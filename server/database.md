@@ -106,18 +106,18 @@
   deposit: number,          // 押金金额（分）
   status: string,           // available / occupied / dirty
 
-  // 第三方平台关联（支持多 PMS）
-  thirdparty: [
-    { platform: string, houseId: string }
-    // 如 { platform: "hostex", houseId: "12556371" }
-    // 如 { platform: "fliggy", houseId: "FL_98765" }
+  // PMS 平台关联（支持多 PMS）
+  pms: [
+    { platform: string, roomId: string }
+    // 如 { platform: "hostex", roomId: "12556371" }
+    // 如 { platform: "fliggy", roomId: "FL_98765" }
   ]
 }
 ```
 
 > 房间状态流转：available → occupied（支付成功）→ dirty（退房）→ available（打扫完成）
 >
-> 入住时：前端传 platformRoomId + platform，后端查 thirdparty 映射拿到 roomNumber
+> 入住时：前端传 pmsRoomId + pms，后端查 pms 映射拿到 roomNumber
 
 ---
 
