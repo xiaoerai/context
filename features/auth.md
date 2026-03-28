@@ -1,6 +1,6 @@
 # 登录认证
 
-> 状态：🔄 改造中（短信验证码待接入真实服务）
+> 状态：✅ 基本完成（短信验证码待接入真实服务）
 
 ---
 
@@ -23,7 +23,7 @@
 | 认证服务 | ✅ 完成 | `services/auth.service.ts`（多端 platform 路由已实现） |
 | 支付宝 OAuth | ✅ 完成 | `services/alipay.service.ts`（`getAlipayUserId` 已实现） |
 | 短信服务 | ✅ 完成 | `services/sms.service.ts`（阿里云短信未接入，开发阶段 mock）|
-| 数据库 | ✅ 完成 | `db/users.ts`（phone 为唯一标识，alipayUserId 已添加） |
+| 数据库 | ✅ 完成 | `db/users.ts`（phone 为唯一标识，存 phone + guestIds） |
 
 ### API
 
@@ -136,9 +136,11 @@ POST /api/auth/login
 `platform` 取值：`alipay` | `wechat` | `h5`
 
 **后端根据 platform 走不同逻辑**：
-- `alipay` → `alipay.system.oauth.token` 换 `user_id`，存入 `alipayUserId`
-- `wechat` → `jscode2session` 换 `openid`，存入 `openid`
+- `alipay` → `alipay.system.oauth.token` 换 `user_id`
+- `wechat` → `jscode2session` 换 `openid`
 - `h5` → 不需要平台授权
+
+> JWT 中包含 phone + 各平台 ID（alipayUserId 等），平台 ID 不存数据库，仅在 JWT 中携带，支付时使用。
 
 **响应**：
 ```json
@@ -160,8 +162,7 @@ POST /api/auth/login
 {
   _id: string,
   phone: string,              // 手机号（跨端唯一标识，索引）
-  openid?: string,            // 微信 openid
-  alipayUserId?: string,      // 支付宝 user_id（支付时作为 buyer_id）
+  guestIds?: string[],        // 关联的住客ID列表
   createdAt: Date,
   lastLoginAt: Date
 }

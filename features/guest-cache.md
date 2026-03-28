@@ -75,7 +75,7 @@
 
 | 模块 | 状态 | 文件 |
 |------|------|------|
-| User 表加 guestIds 字段 | 🔧 开发中 | `db/users.ts` |
+| User 表含 guestIds 字段 | ✅ 完成 | `db/users.ts` |
 | checkin 成功后关联住客 | ⬜ 待开发 | `controllers/checkin.controller.ts` |
 | 获取历史住客接口 | ⬜ 待开发 | `controllers/user.controller.ts` |
 | 用户路由 | ⬜ 待开发 | `routes/user.ts` |

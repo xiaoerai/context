@@ -1,6 +1,6 @@
 # 退房与退款
 
-> 状态：🔄 开发中
+> 状态：🔄 部分完成（退房接口已完成，退款待开发）
 
 ---
 
@@ -10,15 +10,14 @@
 
 | 模块 | 状态 | 文件 |
 |------|------|------|
-| StayCard 改造 | ⬜ 待开发 | `pages/index/components/StayCard/index.tsx` |
-| 删除 currentStay，改用 checkinRecord | ⬜ 待开发 | `stores/slices/hotelSlice.ts`、`checkinSlice.ts` |
+| StayCard 退房按钮 | ✅ 完成 | `pages/index/components/StayCard/index.tsx` |
 | 退房确认弹窗 | ⬜ 待开发 | StayCard 内弹窗 |
 
 ### 后端
 
 | 模块 | 状态 | 文件 |
 |------|------|------|
-| 退房接口 | ⬜ 待开发 | `controllers/checkout.controller.ts` |
+| 退房接口 | ✅ 完成 | `services/checkin.service.ts`（checkout 方法） |
 | 退款接口 | ⬜ 待开发 | `controllers/deposit.controller.ts` |
 | 支付宝退款 | ⬜ 待开发 | `services/alipay.service.ts` |
 
@@ -27,7 +26,7 @@
 | 接口 | 方法 | 状态 | 说明 |
 |------|------|------|------|
 | `/api/checkin/:orderId` | GET | ✅ 已有 | 查询入住状态，StayCard 数据来源 |
-| `/api/checkout` | POST | ⬜ 待开发 | 客户提交退房 |
+| `/api/checkin/checkout` | POST | ✅ 完成 | 退房（状态改 checked_out，房间状态改 dirty） |
 | `/api/deposit/refund` | POST | ⬜ 待开发 | 老板端退款操作 |
 
 ---

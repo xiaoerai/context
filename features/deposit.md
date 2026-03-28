@@ -1,6 +1,6 @@
 # 押金支付
 
-> 状态：✅ 完成（支付流程已测试通过，收钱吧待申请，当前以支付宝直连运行）
+> 状态：✅ 完成（支付流程已在真机测试通过，收钱吧待申请，当前以支付宝直连运行）
 
 ---
 
@@ -29,7 +29,7 @@
 | 接口 | 状态 |
 |------|------|
 | `POST /api/deposit/create` | ✅ 完成（auth 中间件校验 JWT，取 `alipayUserId` 作为 `buyer_id`） |
-| `POST /api/deposit/notify` | ✅ 完成（验签，TRADE_SUCCESS/TRADE_FINISHED 更新押金状态） |
+| `POST /api/deposit/notify` | ✅ 完成（验签，更新押金状态 + 入住状态 checked_in + 房间状态 occupied） |
 | `GET /api/deposit/:orderId/status` | ✅ 完成（返回押金状态，前端支付后查询用） |
 
 > `/confirm` 接口已删除：状态更新由 `/notify` 负责，查询由 `/status` 负责，`/confirm` 存在安全隐患（前端可伪造支付成功）。
@@ -39,7 +39,7 @@
 | 集合 | 状态 |
 |------|------|
 | deposits | ✅ 已创建 |
-| rooms | ⬜ 待创建数据 |
+| rooms | ✅ 已创建 |
 
 ---
 
@@ -231,7 +231,8 @@ POST /api/deposit/create
 }
 ```
 
-> 返回收钱吧的交易号和支付宝调起参数
+> 返回支付宝交易号（当前阶段为 alipay.trade.create 的 trade_no）。buyer_id 从 JWT 中的 alipayUserId 获取。
+> 押金金额当前为 0.01 元（1 分），测试用。payerUserId 存入押金记录，退款时使用。
 
 ---
 

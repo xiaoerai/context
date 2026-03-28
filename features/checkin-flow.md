@@ -43,15 +43,26 @@
 | `POST /api/rooms/sync` | ✅ 完成 | 从 PMS 同步房间 |
 | `GET /api/rooms` | ✅ 完成 | 获取房间列表 |
 
-### 待改造
+### 已完成的改造
 
 | 改动 | 说明 |
 |------|------|
-| 入住记录 `roomId` → `roomNumber` | 用房间号关联 rooms 表，不依赖第三方 ID |
-| 入住时传 `pmsRoomId` + `pms` | 后端查 rooms 表 pms 映射拿 roomNumber |
-| 入住记录加 `source` 字段 | 记录订单来源 OTA 平台 |
-| 支付成功 → 房间状态改 `occupied` | 在 handleAlipayNotify 中联动 |
-| 退房 → 房间状态改 `dirty` | 在 checkout 中联动 |
+| 入住记录 `roomId` → `roomNumber` | ✅ 用房间号关联 rooms 表，不依赖第三方 ID |
+| 入住时传 `pmsRoomId` + `pms` | ✅ 后端查 rooms 表 pms 映射拿 roomNumber |
+| 入住记录加 `source` 字段 | ✅ 记录订单来源 OTA 平台 |
+| 支付成功 → 房间状态改 `occupied` | ✅ 在 handleAlipayNotify 中联动 |
+| 退房 → 房间状态改 `dirty` | ✅ 在 checkout 中联动 |
+| rooms 表改用 `pms` 数组映射 | ✅ 支持多 PMS 平台 |
+| 订单数据加 `source`/`pms`/`pmsRoomId` | ✅ 从 Hostex 返回平台信息 |
+
+### 待开发
+
+| 改动 | 说明 |
+|------|------|
+| 前端入住时传 `pmsRoomId` + `pms` | 前端需要从订单数据取 houseId 传给后端 |
+| 前端退房确认弹窗 | StayCard 退房按钮的交互逻辑 |
+| 退款接口 `POST /api/deposit/refund` | 老板端操作，调支付宝退款 |
+| 打扫完成接口 `PUT /api/rooms/:roomNumber/status` | 老板端标记房间已打扫 |
 
 ---
 

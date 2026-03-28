@@ -73,7 +73,10 @@
 | `/api/deposit/create` | POST | 创建押金支付订单 |
 | `/api/deposit/notify` | POST | 支付宝异步通知（验签 → 更新状态） |
 | `/api/deposit/:orderId/status` | GET | 查询押金状态 |
-| `/api/user/guests` | GET | 获取用户历史住客列表（开发中） |
+| `/api/checkin/checkout` | POST | 退房（状态改 checked_out，房间改 dirty） |
+| `/api/rooms/sync` | POST | 从 PMS 同步房间数据 |
+| `/api/rooms` | GET | 获取房间列表 |
+| `/api/user/guests` | GET | 获取用户历史住客列表（待开发） |
 
 ---
 
