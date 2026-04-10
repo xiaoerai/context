@@ -1,6 +1,6 @@
 # 退房与退款
 
-> 状态：🔄 部分完成（退房接口已完成，退款待开发）
+> 状态：🔄 基本完成（退房+退款接口已完成，退款缺权限校验）
 
 ---
 
@@ -11,23 +11,25 @@
 | 模块 | 状态 | 文件 |
 |------|------|------|
 | StayCard 退房按钮 | ✅ 完成 | `pages/index/components/StayCard/index.tsx` |
-| 退房确认弹窗 | ⬜ 待开发 | StayCard 内弹窗 |
+| 退房确认弹窗 | ✅ 完成 | `pages/index/index.tsx`（Taro.showModal） |
+| StayCard 改造 | ✅ 完成 | 用 checkinRecord，支持 checkout_pending 状态 |
 
 ### 后端
 
 | 模块 | 状态 | 文件 |
 |------|------|------|
 | 退房接口 | ✅ 完成 | `services/checkin.service.ts`（checkout 方法） |
-| 退款接口 | ⬜ 待开发 | `controllers/deposit.controller.ts` |
-| 支付宝退款 | ⬜ 待开发 | `services/alipay.service.ts` |
+| 退款接口 | ✅ 完成 | `controllers/deposit.controller.ts`（refund） |
+| 支付宝退款 | ✅ 完成 | `services/alipay.service.ts`（refundTrade） |
+| 退款权限校验 | ⬜ 待开发 | 退款接口未加 auth 中间件，任何人可调 |
 
 ### API
 
 | 接口 | 方法 | 状态 | 说明 |
 |------|------|------|------|
-| `/api/checkin/:orderId` | GET | ✅ 已有 | 查询入住状态，StayCard 数据来源 |
+| `/api/checkin/:orderId` | GET | ✅ 完成 | 查询入住状态，StayCard 数据来源 |
 | `/api/checkin/checkout` | POST | ✅ 完成 | 退房（状态改 checked_out，房间状态改 dirty） |
-| `/api/deposit/refund` | POST | ⬜ 待开发 | 老板端退款操作 |
+| `/api/deposit/refund` | POST | ✅ 完成 | 退款（缺 auth + 管理员权限校验） |
 
 ---
 
@@ -37,23 +39,14 @@
 
 ---
 
-## StayCard 改造
+## StayCard（已完成）
 
-### 现状
-- 数据来源：`currentStay`（mock 硬编码）
-- 按钮：「详情」+「开门密码」
-
-### 改造后
-- 数据来源：`checkinRecord`（从后端 `/api/checkin/:orderId` 拉取）
+- 数据来源：`checkinRecord`（从 useAppStore 获取）
 - 按钮：「开门密码」+「退房」
-- 房间名右侧显示 Wi-Fi 信息
-- 删除 `currentStay` 和 `StayInfo` 类型，全部用 `CheckinRecord`
-
-### 显示逻辑
-- 有 `checkinRecord` 且 `status = checked_in` → 显示 StayCard
-- `status = checkout_pending` → StayCard 显示「待确认退房」
-- `status = checked_out` / `refunded` → 不显示或显示已退房
-- 无记录 → 不显示 StayCard
+- 显示逻辑：
+  - `status = checked_in` → 显示 StayCard
+  - `status = checkout_pending` → 显示「待确认退房」badge
+  - 其他状态 → 不显示
 
 ---
 
@@ -187,22 +180,8 @@ Authorization: Bearer <token>  (需要管理员权限)
 
 ---
 
-## 后端文件规划
+## 待办事项
 
-| 文件 | 说明 |
-|------|------|
-| `routes/checkout.ts` | 退房路由 |
-| `controllers/checkout.controller.ts` | 退房控制器 |
-| `services/alipay.service.ts` | 新增 refundTrade 函数 |
-| `controllers/deposit.controller.ts` | 新增 refund handler |
-
----
-
-## 前端改动
-
-| 文件 | 改动 |
-|------|------|
-| `stores/slices/hotelSlice.ts` | 删除 `currentStay`、`StayInfo` |
-| `stores/slices/checkinSlice.ts` | StayCard 数据来源 |
-| `pages/index/components/StayCard/index.tsx` | 改用 checkinRecord，改按钮，加 Wi-Fi |
-| `pages/index/index.tsx` | 去掉 mock 数据，加载时拉 checkinRecord |
+1. ⬜ 退款接口加 auth 中间件 + 管理员权限校验（安全问题）
+2. ⬜ 老板端退款管理页面（查看待退款列表、操作退款、支持部分退款）
+3. ⬜ 打扫完成接口 `PUT /api/rooms/:roomNumber/status`（老板端标记房间已打扫）

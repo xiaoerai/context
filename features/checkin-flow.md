@@ -60,9 +60,11 @@
 | 改动 | 说明 |
 |------|------|
 | 前端入住时传 `pmsRoomId` + `pms` | 前端需要从订单数据取 houseId 传给后端 |
-| 前端退房确认弹窗 | StayCard 退房按钮的交互逻辑 |
-| 退款接口 `POST /api/deposit/refund` | 老板端操作，调支付宝退款 |
+| 入住接口加 auth 中间件 | `POST /api/checkin` 目前无权限校验 |
 | 打扫完成接口 `PUT /api/rooms/:roomNumber/status` | 老板端标记房间已打扫 |
+
+> 退房确认弹窗 ✅ 已完成（`pages/index/index.tsx` 中 `Taro.showModal`）
+> 退款接口 ✅ 已完成（`controllers/deposit.controller.ts` + `services/alipay.service.ts`）
 
 ---
 

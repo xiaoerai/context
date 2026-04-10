@@ -31,6 +31,7 @@
 | `POST /api/deposit/create` | ✅ 完成（auth 中间件校验 JWT，取 `alipayUserId` 作为 `buyer_id`） |
 | `POST /api/deposit/notify` | ✅ 完成（验签，更新押金状态 + 入住状态 checked_in + 房间状态 occupied） |
 | `GET /api/deposit/:orderId/status` | ✅ 完成（返回押金状态，前端支付后查询用） |
+| `POST /api/deposit/refund` | ✅ 完成（退款，但缺 auth + 管理员权限校验） |
 
 > `/confirm` 接口已删除：状态更新由 `/notify` 负责，查询由 `/status` 负责，`/confirm` 存在安全隐患（前端可伪造支付成功）。
 
